@@ -1,6 +1,6 @@
 # Project
 
-ACS Webchat Adapter is a project for connecting Webchat UX to ACS chat.
+ACS WebChat Adapter is a project for connecting WebChat UX to ACS chat.
 
 ## Contributing
 
