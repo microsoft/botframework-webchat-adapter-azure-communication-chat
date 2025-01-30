@@ -1,0 +1,1 @@
+{"version":3,"file":"createAdapter.d.ts","sourceRoot":"","sources":["../../../src/libs/createAdapter.ts"],"names":[],"mappings":";AAGA,OAAO,EAEL,eAAe,EACf,cAAc,EACd,YAAY,EAEZ,aAAa,EACd,MAAM,uBAAuB,CAAC;AAS/B,MAAM,CAAC,OAAO,UAAU,aAAa,CAAC,SAAS,EAAE,aAAa,SAAS,YAAY,EACjF,OAAO,GAAE,cAAmB,EAC5B,QAAQ,GAAE,eAAe,CAAC,SAAS,EAAE,aAAa,CAAoB,GACrE,aAAa,CAAC,SAAS,EAAE,aAAa,CAAC,CAyIzC"}

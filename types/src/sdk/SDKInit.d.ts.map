@@ -1,0 +1,1 @@
+{"version":3,"file":"SDKInit.d.ts","sourceRoot":"","sources":["../../../src/sdk/SDKInit.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,UAAU,EAAE,gBAAgB,EAAE,MAAM,2BAA2B,CAAC;AASzE,eAAO,MAAM,OAAO,UACX,MAAM,MACT,MAAM,YACA,MAAM,kBACA,MAAM,gBACR,MAAM,eACP,UAAU;gBACA,UAAU;sBAAoB,gBAAgB;EA8FtE,CAAC"}

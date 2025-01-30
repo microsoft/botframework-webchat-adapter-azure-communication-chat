@@ -1,0 +1,1 @@
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../../src/ingress/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,eAAe,EAAE,cAAc,EAAE,MAAM,uBAAuB,CAAC;AAExE,OAAO,EAAE,eAAe,EAAE,MAAM,2BAA2B,CAAC;AAC5D,OAAO,EAAE,qBAAqB,EAAE,MAAM,iCAAiC,CAAC;AAKxE,MAAM,CAAC,OAAO,UAAU,qBAAqB,CAC3C,cAAc,CAAC,EAAE,cAAc,GAC9B,eAAe,CAAC,qBAAqB,EAAE,eAAe,CAAC,CAGzD"}
