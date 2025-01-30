@@ -1,0 +1,1 @@
+{"version":3,"file":"extractAdapterAPI.d.ts","sourceRoot":"","sources":["../../../src/libs/extractAdapterAPI.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,YAAY,EAAE,aAAa,EAAE,MAAM,uBAAuB,CAAC;AAE7E,MAAM,CAAC,OAAO,UAAU,iBAAiB,CAAC,SAAS,EAAE,aAAa,SAAS,YAAY,EACrF,OAAO,EAAE,OAAO,CAAC,SAAS,EAAE,aAAa,CAAC,GACzC,aAAa,CAAC,SAAS,EAAE,aAAa,CAAC,CAWzC"}

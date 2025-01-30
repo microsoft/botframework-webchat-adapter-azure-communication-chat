@@ -1,0 +1,1 @@
+{"version":3,"file":"BotAttachment.d.ts","sourceRoot":"","sources":["../../../src/models/BotAttachment.ts"],"names":[],"mappings":"AAAA,MAAM,MAAM,aAAa,GAAG;IAC1B,IAAI,EAAE,MAAM,CAAC;IACb,WAAW,EAAE,MAAM,CAAC;IACpB,OAAO,EAAE,mBAAmB,CAAC;CAC9B,CAAC;AAEF,KAAK,mBAAmB,GAAG;IACzB,QAAQ,EAAE,MAAM,CAAC;CAClB,CAAC"}
