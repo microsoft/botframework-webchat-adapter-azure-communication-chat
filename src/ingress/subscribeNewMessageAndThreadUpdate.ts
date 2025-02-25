@@ -389,6 +389,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const messageCache: Map<string, ChatEqualityFields> = new Map<string, ChatEqualityFields>();
               const newMessagesBeforeWebChatInit: ChatMessageReceivedEvent[] = [];
               const polledHistoryMessagesBeforeWebChatInit: ChatMessage[] = [];
+              const initialPollingOptimizationCount = 45;  // shorter polling interval for the initial set count of 45 iterations of 1 sec each
 
               const pollForMessages = async (
                 delaytm: number,
@@ -565,9 +566,13 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     }
                     pollingCallbackId = window.setTimeout(
                       async () => {
+                        if (iteration <= initialPollingOptimizationCount) {
+                          previousPollingCallTimerFinished = true;
+                        }
+
                         await pollForMessages(delaytm, chatThreadClient, startTime, lastMessageReceived, iteration + 1);
                       },
-                      iteration <= 2 ? 15000 : delaytm // shorter interval for the initial 30s
+                      iteration <= initialPollingOptimizationCount ? 1000 : delaytm
                     );
 
                     Logger.logEvent(LogLevel.INFO, {
