@@ -1,8 +1,27 @@
-import { CommunicationIdentifier, getIdentifierKind } from '@azure/communication-common';
+import {
+  CommunicationIdentifier,
+  CommunicationIdentifierKind,
+  CommunicationUserIdentifier,
+  getIdentifierKind
+} from '@azure/communication-common';
 import { Logger, LogLevel } from '../log/Logger';
 import { FileMetadata, IFileManager, IUploadedFile } from '../types/FileManagerTypes';
 import { LogEvent } from '../types/LogTypes';
 import EventManager from '../utils/EventManager';
+import { ACSAdapterState, StateKey } from '../models/ACSAdapterState';
+import {
+  checkDuplicateMessage,
+  checkDuplicateParticipantMessage,
+  createParticipantMessageKeyWithMessage,
+  createParticipantMessageKeyWithParticipantsEvent
+} from '../utils/MessageComparison';
+import { ChatEqualityFields, GetStateFunction } from '../types/AdapterTypes';
+import { ChatMessage, ParticipantsAddedEvent, ParticipantsRemovedEvent } from '@azure/communication-chat';
+import {
+  logProcessingParticipantAddedEvent,
+  logProcessingParticipantRemovedEvent,
+  logUnsupportedMessageType
+} from '../utils/LoggerUtils';
 
 /**
  * Returns the users id.
@@ -140,4 +159,167 @@ export const getAttachmentSizes = (files: File[]): number[] => {
   return files.map((file) => {
     return file?.size;
   });
+};
+
+export interface ProcessChatMessageEventProps {
+  id: string;
+  message: string;
+  createdOn: Date;
+  editedOn?: Date;
+  metadata?: { [key: string]: any };
+  sender: CommunicationIdentifierKind;
+  threadId: string;
+}
+
+/**
+ * Processes and caches a new chat text message if it has not been processed before.
+ *
+ * @param messageCache - A map to store processed messages with their IDs as keys.
+ * @param event - The chat message received event containing message details.
+ * @param getState - A function to get the current state of the ACS adapter.
+ * @param fileManager - An interface to manage file-related operations.
+ * @param messageTypeLogString - A string to log the type of message being processed.
+ * @returns A boolean indicating whether the message was already processed.
+ */
+export const cacheTextMessageIfNeeded = (
+  messageCache: Map<string, ChatEqualityFields>,
+  event: ProcessChatMessageEventProps,
+  getState: GetStateFunction<ACSAdapterState>,
+  fileManager: IFileManager,
+  processingLogEvent: LogEvent
+): boolean => {
+  const isProcessed = checkDuplicateMessage(messageCache, event.id, {
+    content: event.message,
+    createdOn: event.createdOn,
+    updatedOn: event.editedOn,
+    fileIds: fileManager?.getFileIds(event.metadata)
+  });
+  if (!isProcessed) {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: processingLogEvent,
+      Description: `ACS Adapter: Processing message`,
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: event.id
+    });
+    messageCache.set(event.id, {
+      content: event.message,
+      createdOn: event.createdOn,
+      updatedOn: event.editedOn,
+      fileIds: fileManager?.getFileIds(event.metadata)
+    });
+  }
+  return isProcessed;
+};
+
+export const isDuplicateMessage = (
+  message: ChatMessage,
+  messageCache: Map<string, ChatEqualityFields>,
+  fileManager: IFileManager
+): boolean => {
+  switch (message.type) {
+    case 'text':
+      return checkDuplicateMessage(messageCache, message.id, {
+        content: message.content.message,
+        createdOn: message.createdOn,
+        updatedOn: message.editedOn,
+        fileIds: fileManager?.getFileIds(message.metadata)
+      });
+    case 'participantAdded': {
+      const key = createParticipantMessageKeyWithMessage(message);
+      return checkDuplicateParticipantMessage(messageCache, key, {
+        addedParticipants: message.content.participants,
+        createdOn: message.createdOn
+      });
+    }
+    case 'participantRemoved': {
+      const key = createParticipantMessageKeyWithMessage(message);
+      return checkDuplicateParticipantMessage(messageCache, key, {
+        removedParticipants: message.content.participants,
+        createdOn: message.createdOn
+      });
+    }
+    default:
+      logUnsupportedMessageType(message);
+      return false;
+  }
+};
+
+export const updateMessageCacheWithMessage = (
+  message: ChatMessage,
+  messageCache: Map<string, ChatEqualityFields>,
+  fileManager: IFileManager
+): void => {
+  switch (message.type) {
+    case 'text': {
+      messageCache.set(message.id, {
+        content: message.content.message,
+        createdOn: message.createdOn,
+        updatedOn: message.editedOn,
+        fileIds: fileManager?.getFileIds(message.metadata)
+      });
+      break;
+    }
+    case 'participantAdded': {
+      const key = createParticipantMessageKeyWithMessage(message);
+      messageCache.set(key, {
+        addedParticipants: message.content.participants,
+        createdOn: message.createdOn
+      });
+      break;
+    }
+    case 'participantRemoved': {
+      const key = createParticipantMessageKeyWithMessage(message);
+      messageCache.set(key, {
+        removedParticipants: message.content.participants,
+        createdOn: message.createdOn
+      });
+      break;
+    }
+    default: {
+      logUnsupportedMessageType(message);
+      break;
+    }
+  }
+};
+
+export const cacheParticipantAddedEventIfNeeded = (
+  messageCache: Map<string, ChatEqualityFields>,
+  event: ParticipantsAddedEvent,
+  getState: GetStateFunction<ACSAdapterState>
+): boolean => {
+  const key = createParticipantMessageKeyWithParticipantsEvent(event);
+  const isProcessed = checkDuplicateParticipantMessage(messageCache, key, {
+    addedParticipants: event.participantsAdded,
+    createdOn: event.addedOn
+  });
+  if (!isProcessed) {
+    logProcessingParticipantAddedEvent(getState, event);
+    messageCache.set(key, {
+      addedParticipants: event.participantsAdded,
+      createdOn: event.addedOn
+    });
+  }
+  return isProcessed;
+};
+
+export const cacheParticipantRemovedEventIfNeeded = (
+  messageCache: Map<string, ChatEqualityFields>,
+  event: ParticipantsRemovedEvent,
+  getState: GetStateFunction<ACSAdapterState>
+): boolean => {
+  const key = createParticipantMessageKeyWithParticipantsEvent(event);
+  const isProcessed = checkDuplicateParticipantMessage(messageCache, key, {
+    removedParticipants: event.participantsRemoved,
+    createdOn: event.removedOn
+  });
+  if (!isProcessed) {
+    logProcessingParticipantRemovedEvent(getState, event);
+    messageCache.set(key, {
+      removedParticipants: event.participantsRemoved,
+      createdOn: event.removedOn
+    });
+  }
+  return isProcessed;
 };

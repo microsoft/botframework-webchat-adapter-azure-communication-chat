@@ -4,36 +4,37 @@ import {
   ChatMessage,
   ChatMessageEditedEvent,
   ChatMessageReceivedEvent,
-  ChatParticipant,
   ChatThreadClient,
   ChatThreadDeletedEvent,
   ParticipantsAddedEvent,
   ParticipantsRemovedEvent,
-  TypingIndicatorReceivedEvent
+  TypingIndicatorReceivedEvent,
+  StreamingChatMessageChunkReceivedEvent
 } from '@azure/communication-chat';
 import { LogLevel, Logger } from '../log/Logger';
-
 import { ACSDirectLineActivity } from '../models/ACSDirectLineActivity';
 import { AdapterEnhancer, ReadyState } from '../types/AdapterTypes';
 import { AdapterOptions } from '../types/AdapterTypes';
 import { CommunicationUserIdentifier } from '@azure/communication-common';
 import { Constants } from '../Constants';
 import EventManager, { CustomEvent } from '../utils/EventManager';
-import { IUserUpdate } from '../types/DirectLineTypes';
 import { LogEvent } from '../types/LogTypes';
 import Observable from 'core-js/features/observable';
 import { applySetStateMiddleware } from '../libs';
 import createEditedMessageToDirectLineActivityMapper from './mappers/createEditedMessageToDirectLineActivityMapper';
 import createErrorMessageToDirectLineActivityMapper from './mappers/createErrorMessageToDirectLineActivityMapper';
-import createHistoryMessageToDirectLineActivityMapper, {
-  createHistoryAttachmentMessageToDirectLineActivityMapper
-} from './mappers/createHistoryMessageToDirectLineActivityMapper';
+import { createHistoryAttachmentMessageToDirectLineActivityMapper } from './mappers/createHistoryMessageToDirectLineActivityMapper';
 import createThreadDeleteToDirectLineActivityMapper from './mappers/createThreadDeleteToDirectLineActivityMapper';
-import createThreadUpdateToDirectLineActivityMapper from './mappers/createThreadUpdateToDirectLineActivityMapper';
 import createTypingMessageToDirectLineActivityMapper from './mappers/createTypingMessageToDirectLineActivityMapper';
 import createUserMessageToDirectLineActivityMapper from './mappers/createUserMessageToDirectLineActivityMapper';
-import { getIdFromIdentifier } from './ingressHelpers';
-import { checkDuplicateMessage } from '../utils/Common';
+import {
+  getIdFromIdentifier,
+  isDuplicateMessage,
+  cacheParticipantAddedEventIfNeeded,
+  cacheTextMessageIfNeeded,
+  updateMessageCacheWithMessage,
+  cacheParticipantRemovedEventIfNeeded
+} from './ingressHelpers';
 import { ChatEqualityFields, FileMetadata, IFileManager } from '../types';
 import packageInfo from '../../package.json';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
@@ -41,6 +42,44 @@ import { AdapterErrorEventType } from '../types/ErrorEventTypes';
 import { queueAttachmentDownloading } from '../utils/AttachmentProcessor';
 import { ConnectionStatus } from '../libs/enhancers/exportDLJSInterface';
 import { IMessagePollingHandle } from '../types/MessagePollingTypes';
+import {
+  logStreamingMessageChunkEventAlreadyProcessed,
+  logStreamingMessageChunkEventReceived,
+  logParticipantAddedEventReceived,
+  logPollingSkippedThreadDeleted as logAdapterPollingSkipped,
+  logSendPollingRequest,
+  logSkipProcessedPolledMessage,
+  logProcessingPolledMessage,
+  logCachePolledHistoryMessage,
+  logWebChatConnectedEvent,
+  logProcessCachedPagedHistoryMessage,
+  logPollingMessageFetchFailed,
+  logCancellingPollingCallback,
+  logPollingCallbackCreated,
+  logPollingCallStopped,
+  logPollingStatusCode,
+  logCancelPolling,
+  logParticipantAddedEventAlreadyProcessed,
+  logCacheParticipantsAddedEvent,
+  logProcessPolledCachedHistoryMessage,
+  logProcessCachedTextMessage,
+  logProcessCachedParticipantsAddedEvent,
+  logCacheParticipantRemovedEvent,
+  logParticipantRemovedEventReceived,
+  logParticipantRemovedEventAlreadyProcessed,
+  logProcessCachedParticipantsRemovedEvent
+} from '../utils/LoggerUtils';
+import { convertStreamingMessageChunkEvent } from './eventconverters/StreamingMessageChunkReceivedEventConverter';
+import {
+  convertAndProcessHistoryMessageByType,
+  processHistoryMessage
+} from './eventconverters/HistoryMessageConverter';
+import { processParticipants } from './eventconverters/ParticipantsConverter';
+import {
+  isChatMessageTypeSupported,
+  isParticipantsAddedEvent,
+  isParticipantsRemovedEvent
+} from '../utils/MessageUtils';
 
 // Cached offsets for history messages' pagination
 let MessageHistoryCurrentPage: any = undefined;
@@ -72,21 +111,6 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
           TimeStamp: event.createdOn.toISOString(),
           ChatThreadId: event.threadId,
           ChatMessageId: event.id
-        });
-
-        return activity;
-      };
-
-      const convertHistoryMessage = async (message: ChatMessage): Promise<void | ACSDirectLineActivity> => {
-        const activity = await createHistoryMessageToDirectLineActivityMapper({ getState })()(message);
-
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-          Description: 'ACS Adapter: convert history message:',
-          CustomProperties: message, // remove content to protect sensitive user info
-          MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: message.createdOn.toISOString(),
-          ChatMessageId: message.id
         });
 
         return activity;
@@ -157,17 +181,6 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
         return activity;
       };
 
-      const convertThreadUpdate = async (user: IUserUpdate): Promise<void | ACSDirectLineActivity> => {
-        const activity = await createThreadUpdateToDirectLineActivityMapper({ getState })()(user);
-
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_THREAD_UPDATED,
-          Description: 'ACS Adapter: convert thread update'
-        });
-
-        return activity;
-      };
-
       const convertThreadDelete = async (event: ChatThreadDeletedEvent): Promise<void | ACSDirectLineActivity> => {
         const activity = await createThreadDeleteToDirectLineActivityMapper({ getState })()(event);
 
@@ -201,28 +214,18 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
           });
           let nextMessage = await pagedAsyncIterableIterator.next();
           while (!nextMessage.done) {
-            const chatMessage = nextMessage.value;
-            if (chatMessage.type !== 'text') {
-              nextMessage = await pagedAsyncIterableIterator.next();
-              continue;
-            }
-
-            if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-              Logger.logEvent(LogLevel.INFO, {
-                Event: LogEvent.CACHE_PAGED_HISTORY_MESSAGE,
-                Description: 'ACS Adapter: Cache paged history message',
-                TimeStamp: new Date().toISOString(),
-                ChatThreadId: getState(StateKey.ThreadId),
-                ACSRequesterUserId: getState(StateKey.UserId),
-                ChatMessageId: chatMessage.id
-              });
-              PagedHistoryMessagesBeforeWebChatInit.push(chatMessage);
-              nextMessage = await pagedAsyncIterableIterator.next();
-              continue;
-            }
+            const chatMessage: ChatMessage = nextMessage.value;
+            const logDescription = 'ACS Adapter: Cache paged history message';
+            processHistoryMessage(
+              PagedHistoryMessagesBeforeWebChatInit,
+              chatMessage,
+              logDescription,
+              unsubscribed,
+              getState,
+              next
+            );
+            // update list iterator
             nextMessage = await pagedAsyncIterableIterator.next();
-            const activity = await convertHistoryMessage(chatMessage);
-            !unsubscribed && next(activity);
           }
         } else {
           let pagedAsyncIterableIterator = MessageHistoryIterator;
@@ -236,36 +239,29 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               .byPage();
           }
 
+          const logDescription = 'ACS Adapter: Cache paged history message  (with pagesize limit)';
           let i = 0;
           while (i < pageSizeLimit) {
             const cachedPage = MessageHistoryCurrentPage;
             const cachedOffset = MessageHistoryOffset;
 
-            let isCachedPageDone = false;
-            if (cachedPage && !isCachedPageDone) {
+            if (cachedPage) {
               for (let j = cachedOffset >= 0 ? cachedOffset : 0; j < cachedPage.value.length; j++) {
                 const message = cachedPage.value[j];
-                if (message.type !== 'text') {
-                  continue;
-                }
-                if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                  Logger.logEvent(LogLevel.INFO, {
-                    Event: LogEvent.CACHE_PAGED_HISTORY_MESSAGE,
-                    Description: 'ACS Adapter: Cache paged history message  (with pagesize limit next page)',
-                    TimeStamp: new Date().toISOString(),
-                    ChatThreadId: getState(StateKey.ThreadId),
-                    ACSRequesterUserId: getState(StateKey.UserId),
-                    ChatMessageId: message.id
-                  });
-                  PagedHistoryMessagesBeforeWebChatInit.push(message);
+
+                const wasMessageProcessed = processHistoryMessage(
+                  PagedHistoryMessagesBeforeWebChatInit,
+                  message,
+                  logDescription,
+                  unsubscribed,
+                  getState,
+                  next
+                );
+                if (wasMessageProcessed) {
+                  // If message was processed, count this message toward page limit
                   i++;
-                  continue;
                 }
-                const activity = await convertHistoryMessage(message);
-                !unsubscribed && next(activity);
-                i++;
               }
-              isCachedPageDone = true;
             }
 
             const nextMessage = await pagedAsyncIterableIterator.next();
@@ -280,26 +276,18 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 break;
               }
               const message = nextMessage.value[j];
-              if (message.type !== 'text') {
-                continue;
-              }
-
-              if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                Logger.logEvent(LogLevel.INFO, {
-                  Event: LogEvent.CACHE_PAGED_HISTORY_MESSAGE,
-                  Description: 'ACS Adapter: Cache paged history message  (with pagesize limit)',
-                  TimeStamp: new Date().toISOString(),
-                  ChatThreadId: getState(StateKey.ThreadId),
-                  ACSRequesterUserId: getState(StateKey.UserId),
-                  ChatMessageId: message.id
-                });
-                PagedHistoryMessagesBeforeWebChatInit.push(message);
+              const wasMessageProcessed = processHistoryMessage(
+                PagedHistoryMessagesBeforeWebChatInit,
+                message,
+                logDescription,
+                unsubscribed,
+                getState,
+                next
+              );
+              if (wasMessageProcessed) {
+                // If message was processed, count this message toward page limit
                 i++;
-                continue;
               }
-              const activity = await convertHistoryMessage(message);
-              !unsubscribed && next(activity);
-              i++;
             }
           }
         }
@@ -387,9 +375,13 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               ) as ChatThreadClient;
 
               const messageCache: Map<string, ChatEqualityFields> = new Map<string, ChatEqualityFields>();
-              const newMessagesBeforeWebChatInit: ChatMessageReceivedEvent[] = [];
+              const newMessagesBeforeWebChatInit: (
+                | ChatMessageReceivedEvent
+                | ParticipantsAddedEvent
+                | ParticipantsRemovedEvent
+              )[] = [];
               const polledHistoryMessagesBeforeWebChatInit: ChatMessage[] = [];
-              const initialPollingOptimizationCount = 45;  // shorter polling interval for the initial set count of 45 iterations of 1 sec each
+              const initialPollingOptimizationCount = 45; // shorter polling interval for the initial set count of 45 iterations of 1 sec each
 
               const pollForMessages = async (
                 delaytm: number,
@@ -403,46 +395,22 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
                 // Ready state is closed so skip polling.
                 if (getReadyState() === ReadyState.CLOSED) {
-                  Logger.logEvent(LogLevel.INFO, {
-                    Event: LogEvent.ACS_ADAPTER_POLLING_SKIPPED,
-                    Description: 'ACS Adapter: Polling skipped because of thread deletion.',
-                    TimeStamp: new Date().toISOString(),
-                    ChatThreadId: getState(StateKey.ThreadId),
-                    ACSRequesterUserId: getState(StateKey.UserId)
-                  });
+                  logAdapterPollingSkipped(getState, 'ACS Adapter: Polling skipped because of thread deletion.');
                   return;
                 }
 
                 try {
                   if (!previousPollingCallTimerFinished) {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_ADAPTER_POLLING_SKIPPED,
-                      Description: 'ACS Adapter: Polling call issued too soon: skipping',
-                      TimeStamp: new Date().toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ACSRequesterUserId: getState(StateKey.UserId)
-                    });
+                    logAdapterPollingSkipped(getState, 'ACS Adapter: Polling call issued too soon: skipping');
                     return;
                   }
 
                   if (!messagePollingInstance?.getIsPollingEnabled()) {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_ADAPTER_POLLING_SKIPPED,
-                      Description: 'ACS Adapter: Polling call disabled from the client: skipping',
-                      TimeStamp: new Date().toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ACSRequesterUserId: getState(StateKey.UserId)
-                    });
+                    logAdapterPollingSkipped(getState, 'ACS Adapter: Polling call disabled from the client: skipping');
                     return;
                   }
 
-                  Logger.logEvent(LogLevel.INFO, {
-                    Event: LogEvent.ACS_SEND_POLLING_REQUEST,
-                    Description: 'ACS Adapter: Send polling request',
-                    TimeStamp: new Date().toISOString(),
-                    ChatThreadId: getState(StateKey.ThreadId),
-                    ACSRequesterUserId: getState(StateKey.UserId)
-                  });
+                  logSendPollingRequest(getState);
                   const iterator = chatThreadClient.listMessages({
                     ...telemetryOptions,
                     startTime: startTime,
@@ -452,68 +420,28 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   let result = await iterator.next();
                   while (!result.done) {
                     const message: ChatMessage = result.value;
-                    // Only process text messages that are new
-                    if (message.type === 'text' && message.sequenceId !== lastMessageReceived) {
+                    // Only process text and participants messages that are new
+                    // TODO: refactor to use message.sequenceId > lastMessageReceived if it doesn't break the functionality
+                    if (isChatMessageTypeSupported(message.type) && message.sequenceId !== lastMessageReceived) {
                       if (!fileManager) {
                         fileManager = getState(StateKey.FileManager);
                       }
-                      const isProcessed = checkDuplicateMessage(messageCache, message.id, {
-                        content: message.content.message,
-                        createdOn: message.createdOn,
-                        updatedOn: message.editedOn,
-                        fileIds: fileManager?.getFileIds(message.metadata)
-                      });
+                      const isProcessed = isDuplicateMessage(message, messageCache, fileManager);
                       if (isProcessed) {
-                        Logger.logEvent(LogLevel.INFO, {
-                          Event: LogEvent.ACS_SKIP_POLLED_MESSAGE,
-                          Description: 'ACS Adapter: Skipping polled message, already processed',
-                          TimeStamp: new Date().toISOString(),
-                          ChatThreadId: getState(StateKey.ThreadId),
-                          ChatMessageId: message.id,
-                          ACSRequesterUserId: getState(StateKey.UserId)
-                        });
+                        logSkipProcessedPolledMessage(getState, message.id);
                       } else {
-                        Logger.logEvent(LogLevel.INFO, {
-                          Event: LogEvent.ACS_PROCESSING_POLLED_MESSAGE,
-                          Description: 'ACS Adapter: Processing polled message ' + message.id,
-                          TimeStamp: new Date().toISOString(),
-                          ChatThreadId: getState(StateKey.ThreadId),
-                          ChatMessageId: message.id,
-                          ACSRequesterUserId: getState(StateKey.UserId)
-                        });
+                        logProcessingPolledMessage(getState, message.id);
                         if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                          Logger.logEvent(LogLevel.INFO, {
-                            Event: LogEvent.CACHE_POLLED_HISTORY_MESSAGE,
-                            Description: 'ACS Adapter: Cache polled history message',
-                            TimeStamp: new Date().toISOString(),
-                            ChatThreadId: getState(StateKey.ThreadId),
-                            ACSRequesterUserId: getState(StateKey.UserId),
-                            ChatMessageId: message.id
-                          });
+                          logCachePolledHistoryMessage(getState, message.id);
                           polledHistoryMessagesBeforeWebChatInit.push(message);
                           result = await iterator.next();
                           continue;
                         }
 
-                        messageCache.set(message.id, {
-                          content: message.content.message,
-                          createdOn: message.createdOn,
-                          updatedOn: message.editedOn,
-                          fileIds: fileManager?.getFileIds(message.metadata)
-                        });
-                        const activity = await convertHistoryMessage(message);
-                        if (activity) {
-                          Logger.logEvent(LogLevel.INFO, {
-                            Event: LogEvent.ACS_ADAPTER_POST_ACTIVITY,
-                            Description: 'ACS Adapter: Post activity, messageId: ' + activity.messageid,
-                            MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
-                            TimeStamp: message.createdOn.toISOString(),
-                            ChatMessageId: message.id,
-                            ACSRequesterUserId: getState(StateKey.UserId)
-                          });
-                          (activity as any).channelData.fromList = true;
-                          next(activity);
-                        }
+                        updateMessageCacheWithMessage(message, messageCache, fileManager);
+
+                        const logDescription = 'ACS Adapter: Post activity, messageId: ';
+                        convertAndProcessHistoryMessageByType(message, getState, next, logDescription);
                       }
                     }
 
@@ -527,13 +455,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   }
                 } catch (exception) {
                   pollingException = exception;
-                  Logger.logEvent(LogLevel.ERROR, {
-                    Event: LogEvent.ACS_SDK_CHATCLIENT_ERROR,
-                    Description: `ACS Adapter: Polling message fetch failed.`,
-                    TimeStamp: new Date().toISOString(),
-                    ChatThreadId: getState(StateKey.ThreadId),
-                    ExceptionDetails: exception
-                  });
+                  logPollingMessageFetchFailed(getState, exception);
                   ErrorEventSubscriber.notifyErrorEvent({
                     StatusCode: exception.response?.status,
                     ErrorType: AdapterErrorEventType.MESSAGE_POLLING_FAILED,
@@ -555,13 +477,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   if (!messagePollingInstance?.stopPolling() && (!pollingException || isPollable(statusCode))) {
                     // If there is a poll active, we cancel it and schedule next one after specified timeout.
                     if (pollingCallbackId) {
-                      Logger.logEvent(LogLevel.INFO, {
-                        Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
-                        Description: 'ACS Adapter: Canceling polling callback with Id ' + pollingCallbackId,
-                        TimeStamp: new Date().toISOString(),
-                        ChatThreadId: getState(StateKey.ThreadId),
-                        ACSRequesterUserId: getState(StateKey.UserId)
-                      });
+                      logCancellingPollingCallback(getState, pollingCallbackId);
                       clearTimeout(pollingCallbackId);
                     }
                     pollingCallbackId = window.setTimeout(
@@ -575,22 +491,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       iteration <= initialPollingOptimizationCount ? 1000 : delaytm
                     );
 
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_CREATE_POLLING_CALLBACK,
-                      Description: 'ACS Adapter: Created polling callback with Id ' + pollingCallbackId,
-                      TimeStamp: new Date().toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ACSRequesterUserId: getState(StateKey.UserId)
-                    });
+                    logPollingCallbackCreated(getState, pollingCallbackId);
                   } else {
                     if (messagePollingInstance?.stopPolling()) {
-                      Logger.logEvent(LogLevel.INFO, {
-                        Event: LogEvent.ACS_ADAPTER_POLLING_STOPPED,
-                        Description: 'ACS Adapter: Polling call stopped from the client',
-                        TimeStamp: new Date().toISOString(),
-                        ChatThreadId: getState(StateKey.ThreadId),
-                        ACSRequesterUserId: getState(StateKey.UserId)
-                      });
+                      logPollingCallStopped(getState);
                     }
                     // Status code is not pollable as the thread is deleted or user doesn't have permission any more.
                     setReadyState(ReadyState.CLOSED);
@@ -599,25 +503,13 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               };
 
               const isPollable = (statusCode: number): boolean => {
-                Logger.logEvent(LogLevel.INFO, {
-                  Event: LogEvent.ACS_ADAPTER_POLLING_STATUSCODE,
-                  Description: 'ACS Adapter: Polling status code ' + statusCode,
-                  TimeStamp: new Date().toISOString(),
-                  ChatThreadId: getState(StateKey.ThreadId),
-                  ACSRequesterUserId: getState(StateKey.UserId)
-                });
+                logPollingStatusCode(getState, statusCode);
                 return !(statusCode === 401 || statusCode === 403 || statusCode === 404);
               };
 
               const reinitializePolling = async (): Promise<void> => {
                 if (pollingCallbackId) {
-                  Logger.logEvent(LogLevel.INFO, {
-                    Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
-                    Description: 'ACS Adapter: Canceling polling in RTN connected callback Id ' + pollingCallbackId,
-                    TimeStamp: new Date().toISOString(),
-                    ChatThreadId: getState(StateKey.ThreadId),
-                    ACSRequesterUserId: getState(StateKey.UserId)
-                  });
+                  logCancelPolling(getState, pollingCallbackId);
                   clearTimeout(pollingCallbackId);
                 }
                 await pollForMessages(getState(StateKey.PollingInterval), chatThreadClient);
@@ -706,81 +598,47 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const subscribeWebChatInitCompleted = async (): Promise<void> => {
                 const eventManager: EventManager = getState(StateKey.EventManager);
                 eventManager?.addEventListener('webchat-status-connected', async () => {
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.WEBCHAT_STATUS_CONNECTED,
-                    Description: `ACS Adapter: Event Webchat connected received`
-                  });
-
+                  logWebChatConnectedEvent();
                   // Process messages for handling cached paged response messages
                   while (PagedHistoryMessagesBeforeWebChatInit.length > 0) {
                     const historyMessage: ChatMessage = PagedHistoryMessagesBeforeWebChatInit.pop();
-                    Logger.logEvent(LogLevel.DEBUG, {
-                      Event: LogEvent.PROCESS_CACHED_PAGED_HISTORY_MESSAGE,
-                      Description: `ACS Adapter: Process cached history message with id ${historyMessage.id}`,
-                      MessageSender: (historyMessage.sender as CommunicationUserIdentifier).communicationUserId,
-                      TimeStamp: historyMessage.createdOn.toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ChatMessageId: historyMessage.id
-                    });
-                    const activity = await convertHistoryMessage(historyMessage);
-                    if (activity) {
-                      Logger.logEvent(LogLevel.INFO, {
-                        Event: LogEvent.ACS_ADAPTER_POST_ACTIVITY,
-                        Description: 'ACS Adapter: Post activity, paged history message with Id: ' + activity.messageid,
-                        MessageSender: (historyMessage.sender as CommunicationUserIdentifier).communicationUserId,
-                        TimeStamp: historyMessage.createdOn.toISOString(),
-                        ChatMessageId: historyMessage.id,
-                        ACSRequesterUserId: getState(StateKey.UserId)
-                      });
-                      (activity as any).channelData.fromList = true;
-                      next(activity);
-                    }
+                    logProcessCachedPagedHistoryMessage(getState, historyMessage);
+                    const logDescription = 'ACS Adapter: Post activity, paged history message with Id: ';
+                    convertAndProcessHistoryMessageByType(historyMessage, getState, next, logDescription);
                   }
-
                   // Process messages for handling cached polled response messages
                   while (polledHistoryMessagesBeforeWebChatInit.length > 0) {
                     const historyMessage: ChatMessage = polledHistoryMessagesBeforeWebChatInit.pop();
-                    Logger.logEvent(LogLevel.DEBUG, {
-                      Event: LogEvent.PROCESS_CACHED_HISTORY_MESSAGE,
-                      Description: `ACS Adapter: Process polled cached history message with Id ${historyMessage.id}`,
-                      MessageSender: (historyMessage.sender as CommunicationUserIdentifier).communicationUserId,
-                      TimeStamp: historyMessage.createdOn.toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ChatMessageId: historyMessage.id
-                    });
-                    messageCache.set(historyMessage.id, {
-                      content: historyMessage.content.message,
-                      createdOn: historyMessage.createdOn,
-                      updatedOn: historyMessage.editedOn,
-                      fileIds: fileManager?.getFileIds(historyMessage.metadata)
-                    });
-                    const activity = await convertHistoryMessage(historyMessage);
-                    if (activity) {
-                      Logger.logEvent(LogLevel.INFO, {
-                        Event: LogEvent.ACS_ADAPTER_POST_ACTIVITY,
-                        Description: 'ACS Adapter: Post activity, history messageId: ' + activity.messageid,
-                        MessageSender: (historyMessage.sender as CommunicationUserIdentifier).communicationUserId,
-                        TimeStamp: historyMessage.createdOn.toISOString(),
-                        ChatMessageId: historyMessage.id,
-                        ACSRequesterUserId: getState(StateKey.UserId)
-                      });
-                      (activity as any).channelData.fromList = true;
-                      next(activity);
-                    }
+                    logProcessPolledCachedHistoryMessage(getState, historyMessage);
+                    updateMessageCacheWithMessage(historyMessage, messageCache, fileManager);
+
+                    const logDescription = 'ACS Adapter: Post activity, history messageId: ' + historyMessage.id;
+                    convertAndProcessHistoryMessageByType(historyMessage, getState, next, logDescription);
                   }
 
                   // Process messages for handling new messages
                   while (newMessagesBeforeWebChatInit.length > 0) {
-                    const pendingMessageEvent: ChatMessageReceivedEvent = newMessagesBeforeWebChatInit.pop();
-                    Logger.logEvent(LogLevel.DEBUG, {
-                      Event: LogEvent.PROCESS_CACHED_NEW_MESSAGE,
-                      Description: `ACS Adapter: Process cached new message with id ${pendingMessageEvent.id}`,
-                      MessageSender: (pendingMessageEvent.sender as CommunicationUserIdentifier).communicationUserId,
-                      TimeStamp: pendingMessageEvent.createdOn.toISOString(),
-                      ChatThreadId: pendingMessageEvent.threadId,
-                      ChatMessageId: pendingMessageEvent.id
-                    });
-                    await onMessageReceived(pendingMessageEvent);
+                    const pendingMessageEvent = newMessagesBeforeWebChatInit.pop();
+                    if (isParticipantsAddedEvent(pendingMessageEvent)) {
+                      logProcessCachedParticipantsAddedEvent(pendingMessageEvent);
+                      processParticipants(
+                        pendingMessageEvent.participantsAdded,
+                        Constants.PARTICIPANT_JOINED,
+                        getState,
+                        next
+                      );
+                    } else if (isParticipantsRemovedEvent(pendingMessageEvent)) {
+                      logProcessCachedParticipantsRemovedEvent(pendingMessageEvent);
+                      processParticipants(
+                        pendingMessageEvent.participantsRemoved,
+                        Constants.PARTICIPANT_LEFT,
+                        getState,
+                        next
+                      );
+                    } else if ('message' in pendingMessageEvent) {
+                      logProcessCachedTextMessage(pendingMessageEvent);
+                      await onMessageReceived(pendingMessageEvent);
+                    }
                   }
                 });
               };
@@ -814,36 +672,24 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     return;
                   }
 
-                  const isProcessed = checkDuplicateMessage(messageCache, event.id, {
-                    content: event.message,
-                    createdOn: event.createdOn,
-                    updatedOn: undefined,
-                    fileIds: fileManager?.getFileIds(event.metadata)
-                  });
+                  const isProcessed = cacheTextMessageIfNeeded(
+                    messageCache,
+                    event,
+                    getState,
+                    fileManager,
+                    LogEvent.ACS_PROCESSING_NEW_MESSAGE
+                  );
+
                   if (isProcessed) {
                     Logger.logEvent(LogLevel.INFO, {
                       Event: LogEvent.ACS_SKIP_NEW_MESSAGE,
-                      Description: 'ACS Adapter: Skipping RTN message, already processed',
+                      Description: `ACS Adapter: Skipping RTN message, already processed`,
                       MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
                       TimeStamp: new Date().toISOString(),
                       ChatThreadId: getState(StateKey.ThreadId),
                       ChatMessageId: event.id
                     });
                     return;
-                  } else {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_PROCESSING_NEW_MESSAGE,
-                      Description: 'ACS Adapter: Processing new message',
-                      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-                      TimeStamp: new Date().toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ChatMessageId: event.id
-                    });
-                    messageCache.set(event.id, {
-                      content: event.message,
-                      createdOn: event.createdOn,
-                      fileIds: fileManager?.getFileIds(event.metadata)
-                    });
                   }
                   const activity = await convertMessage(event);
                   if (activity) {
@@ -883,12 +729,13 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   if (!fileManager) {
                     fileManager = getState(StateKey.FileManager);
                   }
-                  const isProcessed = checkDuplicateMessage(messageCache, event.id, {
-                    content: event.message,
-                    createdOn: event.createdOn,
-                    updatedOn: event.editedOn,
-                    fileIds: fileManager?.getFileIds(event.metadata)
-                  });
+                  const isProcessed = cacheTextMessageIfNeeded(
+                    messageCache,
+                    event,
+                    getState,
+                    fileManager,
+                    LogEvent.ACS_PROCESSING_EDITED_MESSAGE
+                  );
                   if (isProcessed) {
                     Logger.logEvent(LogLevel.INFO, {
                       Event: LogEvent.ACS_SKIP_EDITED_MESSAGE,
@@ -899,21 +746,6 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       ChatMessageId: event.id
                     });
                     return;
-                  } else {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_PROCESSING_EDITED_MESSAGE,
-                      Description: 'ACS Adapter: Processing edited RTN message',
-                      TimeStamp: new Date().toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-                      ChatMessageId: event.id
-                    });
-                    messageCache.set(event.id, {
-                      content: event.message,
-                      createdOn: event.createdOn,
-                      updatedOn: event.editedOn,
-                      fileIds: fileManager?.getFileIds(event.metadata)
-                    });
                   }
 
                   const activity = await convertEditedMessage(event);
@@ -923,53 +755,75 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 }
               };
 
+              const onStreamingMessageChunkReceived = async (
+                event: StreamingChatMessageChunkReceivedEvent
+              ): Promise<void> => {
+                if (event.threadId === getState(StateKey.ThreadId)) {
+                  logStreamingMessageChunkEventReceived(event);
+
+                  if (!fileManager) {
+                    fileManager = getState(StateKey.FileManager);
+                  }
+                  // value to check if the streaming is just started or if it's an update of the existing streaming message
+                  const versionOfMessageExistsInCache = messageCache.has(event.id);
+                  const isProcessed = cacheTextMessageIfNeeded(
+                    messageCache,
+                    event,
+                    getState,
+                    fileManager,
+                    LogEvent.ACS_PROCESSING_STREAMING_CHAT_MESSAGE_CHUNK
+                  );
+
+                  if (isProcessed) {
+                    logStreamingMessageChunkEventAlreadyProcessed(event);
+                    return;
+                  }
+
+                  const activity = await convertStreamingMessageChunkEvent(
+                    event,
+                    getState,
+                    versionOfMessageExistsInCache
+                  );
+                  if (activity) {
+                    next(activity);
+                  }
+                }
+              };
+
               const onParticipantsAdded = async (event: ParticipantsAddedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.PARTICIPANT_ADDED_RECEIVED,
-                    Description: `ACS Adapter: Received a participant added event`,
-                    ACSRequesterUserId: (event.addedBy.id as CommunicationUserIdentifier).communicationUserId,
-                    TimeStamp: event.addedOn.toISOString(),
-                    ChatThreadId: event.threadId,
-                    UserAdded: event.participantsAdded.map(
-                      (p: ChatParticipant) => (p.id as CommunicationUserIdentifier).communicationUserId
-                    )
-                  });
-                  event.participantsAdded.forEach(async (participant: ChatParticipant) => {
-                    const userId = getIdFromIdentifier(participant.id);
-                    const user: IUserUpdate = {
-                      displayName: participant.displayName,
-                      tag: 'joined',
-                      id: userId
-                    };
-                    const activity = await convertThreadUpdate(user);
-                    next(activity);
-                  });
+                  if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
+                    logCacheParticipantsAddedEvent(event);
+                    newMessagesBeforeWebChatInit.push(event);
+                    return;
+                  }
+                  logParticipantAddedEventReceived(event);
+
+                  const isProcessed = cacheParticipantAddedEventIfNeeded(messageCache, event, getState);
+                  if (isProcessed) {
+                    logParticipantAddedEventAlreadyProcessed(getState, event);
+                    return;
+                  }
+                  processParticipants(event.participantsAdded, Constants.PARTICIPANT_JOINED, getState, next);
                 }
               };
 
               const onParticipantsRemoved = async (event: ParticipantsRemovedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.PARTICIPANT_REMOVED_RECEIVED,
-                    Description: `ACS Adapter: Received a participant removed event`,
-                    ACSRequesterUserId: (event.removedBy.id as CommunicationUserIdentifier).communicationUserId,
-                    TimeStamp: event.removedOn.toISOString(),
-                    ChatThreadId: event.threadId,
-                    UserRemoved: event.participantsRemoved.map(
-                      (p: ChatParticipant) => (p.id as CommunicationUserIdentifier).communicationUserId
-                    )
-                  });
-                  event.participantsRemoved.forEach(async (participant: ChatParticipant) => {
-                    const userId = getIdFromIdentifier(participant.id);
-                    const user: IUserUpdate = {
-                      displayName: participant.displayName,
-                      tag: 'left',
-                      id: userId
-                    };
-                    const activity = await convertThreadUpdate(user);
-                    next(activity);
-                  });
+                  if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
+                    logCacheParticipantRemovedEvent(event);
+                    newMessagesBeforeWebChatInit.push(event);
+                    return;
+                  }
+
+                  logParticipantRemovedEventReceived(event);
+                  const isProcessed = cacheParticipantRemovedEventIfNeeded(messageCache, event, getState);
+                  if (isProcessed) {
+                    logParticipantRemovedEventAlreadyProcessed(getState, event);
+                    return;
+                  }
+
+                  processParticipants(event.participantsRemoved, Constants.PARTICIPANT_LEFT, getState, next);
                 }
               };
 
@@ -1016,6 +870,11 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               Logger.logEvent(LogLevel.DEBUG, {
                 Event: LogEvent.REGISTER_ON_REALTIME_NOTIFICATION_DISCONNECTED,
                 Description: `ACS Adapter: Registering on realtime notification disconnected`
+              });
+              chatClient.on('streamingChatMessageChunkReceived', onStreamingMessageChunkReceived);
+              Logger.logEvent(LogLevel.DEBUG, {
+                Event: LogEvent.REGISTER_ON_STREAMING_CHAT_MESSAGE_CHUNK_RECEIVED,
+                Description: `ACS Adapter: Registering on streaming chat message chunk received`
               });
 
               // notify thread members add/leave notifcation if enableThreadMemberUpdateNotification is set
@@ -1091,6 +950,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 chatClient.off('participantsAdded', onParticipantsAdded);
                 chatClient.off('participantsRemoved', onParticipantsRemoved);
                 chatClient.off('chatThreadDeleted', onChatThreadDeleted);
+                chatClient.off('streamingChatMessageChunkReceived', onStreamingMessageChunkReceived);
               };
             })
           );

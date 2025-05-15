@@ -1,28 +1,28 @@
-enum ActivityType {
+export enum ActivityType {
   Message = 'message',
   Typing = 'typing'
 }
 
-enum Role {
+export enum Role {
   Bot = 'bot',
   Channel = 'channel',
   Unknown = '',
   User = 'user'
 }
 
-type CardAction = any;
-type SuggestedActions = { actions: CardAction[]; to?: string[] };
+export type CardAction = any;
+export type SuggestedActions = { actions: CardAction[]; to?: string[] };
 
 // We are excluding:
 // - Date, because it will be stringified as a string via toISOString().
 // - function, because it don't stringify and will be ignored.
 // - undefined, because it don't stringify, will fail "'key' in obj" check.
-type TwoWaySerializablePrimitive = boolean | null | number | string;
+export type TwoWaySerializablePrimitive = boolean | null | number | string;
 
 // This is more restricted than JSON.
 // We want to make sure stringify/parse will return a structure exactly the same.
 // However, we cannot define a non-cyclic structure here.
-type TwoWaySerializableComplex = {
+export type TwoWaySerializableComplex = {
   [key: string]:
     | TwoWaySerializableComplex
     | TwoWaySerializableComplex[]
@@ -30,7 +30,7 @@ type TwoWaySerializableComplex = {
     | TwoWaySerializablePrimitive[];
 };
 
-interface IDirectLineActivity {
+export interface IDirectLineActivity {
   attachments?: IAttachment[];
   channelData?: TwoWaySerializableComplex;
   channelId: string;
@@ -53,9 +53,10 @@ interface IDirectLineActivity {
   attachmentLayout?: string;
   messageid?: string;
   previousClientActivityID?: string;
+  entities?: TwoWaySerializableComplex[];
 }
 
-interface IAttachment {
+export interface IAttachment {
   /**
    * The filename.
    */
@@ -77,19 +78,10 @@ interface IAttachment {
   thumbnailUrl?: string;
 }
 
-interface IUserUpdate {
+export interface IUserUpdate {
   displayName: string;
   tag: string;
   id: string;
 }
 
-export { ActivityType, Role };
-export type {
-  CardAction,
-  IDirectLineActivity,
-  SuggestedActions,
-  TwoWaySerializableComplex,
-  TwoWaySerializablePrimitive,
-  IUserUpdate,
-  IAttachment
-};
+export const DIRECT_LINE_ACTIVITY_ENTITIES_MESSAGE_STREAMING_VALUE = 'streaminfo';

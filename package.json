@@ -1,12 +1,13 @@
 {
   "name": "@microsoft/botframework-webchat-adapter-azure-communication-chat",
-  "version": "0.0.1-beta.2",
+  "version": "0.0.1-beta.3",
   "description": "An adapter for connecting WebChat with Azure Communication Services",
   "main": "dist/chat-adapter",
   "module": "dist-esm/index",
   "types": "types/index",
   "scripts": {
     "test:unit": "jest",
+    "test:unit-coverage": "jest --coverage --coverageReporters=lcov",
     "test:integration": "wait-on http://localhost:8080/ && jest -c jest.integration.config.js",
     "test:integration-debug": "node --inspect-brk ./node_modules/jest/bin/jest.js -c jest.integration.config.js --runInBand",
     "test:debug": "node --inspect-brk ./node_modules/jest/bin/jest.js --runInBand",
@@ -28,12 +29,13 @@
   "author": "Microsoft Corporation",
   "license": "MIT",
   "dependencies": {
-    "@azure/communication-chat": "^1.5.4",
+    "@azure/communication-chat": "1.6.0-beta.5",
     "@azure/communication-common": "^2.3.1",
     "core-js": "^3.6.5",
     "http-status-codes": "^2.1.4",
     "redux": "^4.0.5",
-    "regenerator-runtime": "^0.13.7"
+    "regenerator-runtime": "^0.13.7",
+    "event-target-shim": "^6.0.2"
   },
   "devDependencies": {
     "@azure/communication-identity": "^1.0.0",
@@ -60,12 +62,11 @@
     "@webpack-cli/serve": "^1.0.1",
     "babel-loader": "^8.2.2",
     "babel-plugin-transform-globalthis": "^1.0.0",
-    "botframework-webchat": "^4.15.4",
+    "botframework-webchat": "^4.18.0",
     "concurrently": "^5.3.0",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.0.0",
-    "event-target-shim": "^6.0.2",
     "jest": "^29.0.0",
     "jest-environment-jsdom": "^29.0.3",
     "npm-cli-login": "^0.0.10",
