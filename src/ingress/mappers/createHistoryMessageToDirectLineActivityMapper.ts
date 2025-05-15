@@ -10,7 +10,7 @@ import EventManager from '../../utils/EventManager';
 import { GetStateFunction } from '../../types/AdapterTypes';
 import { IFileManager } from '../../types/FileManagerTypes';
 import { LogEvent } from '../../types/LogTypes';
-import { convertMessageToActivity } from './createUserMessageToDirectLineActivityMapper';
+import { convertMessageToActivity, ChatEventMessage } from './createUserMessageToDirectLineActivityMapper';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
 
@@ -30,21 +30,12 @@ export function createHistoryAttachmentMessageToDirectLineActivityMapper({
         return null;
       }
 
+      const eventMessage = createEventMessage(message, threadId, currentUserId, files);
       return await convertMessageToActivity(
         eventManager,
-        message.id,
-        message.content?.message,
-        message.createdOn,
-        message.sender,
-        message.senderDisplayName,
-        currentUserId,
-        threadId,
+        eventMessage,
         options?.enableAdaptiveCards,
-        options?.enableMessageErrorHandler,
-        message.metadata,
-        files,
-        message.metadata?.tags,
-        message.id
+        options?.enableMessageErrorHandler
       );
     };
 }
@@ -121,21 +112,33 @@ export default function createHistoryMessageToDirectLineActivityMapper({
       }
     }
 
+    const eventMessage = createEventMessage(message, threadId, currentUserId, files);
     return await convertMessageToActivity(
       eventManager,
-      message.id,
-      message.content?.message,
-      message.createdOn,
-      message.sender,
-      message.senderDisplayName,
-      currentUserId,
-      threadId,
+      eventMessage,
       options?.enableAdaptiveCards,
-      options?.enableMessageErrorHandler,
-      message.metadata,
-      files,
-      message.metadata?.tags,
-      message.id
+      options?.enableMessageErrorHandler
     );
   };
 }
+
+const createEventMessage = (
+  message: ChatMessage,
+  threadId: string,
+  currentUserId: string,
+  files?: File[]
+): ChatEventMessage => {
+  return {
+    messageId: message.id,
+    content: message.content?.message,
+    createdOn: message.createdOn,
+    sender: message.sender,
+    senderDisplayName: message.senderDisplayName,
+    currentUserId,
+    threadId,
+    metadata: message.metadata,
+    tags: message.metadata?.tags,
+    sequenceId: message.id,
+    files
+  };
+};

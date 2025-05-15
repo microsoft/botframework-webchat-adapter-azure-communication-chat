@@ -2,6 +2,7 @@ import Observable from 'core-js/features/observable';
 import { ACSDirectLineActivity, ACSAdapterState } from '..';
 import { EgressMiddleware } from '../libs/applyEgressMiddleware';
 import { IMessagePollingHandle } from './MessagePollingTypes';
+import { ChatParticipant } from '@azure/communication-chat';
 
 interface AdapterOptions {
   enableAdaptiveCards?: boolean; // Whether to enable adaptive card payload in adapter(which will convert content payload into a json string)
@@ -86,8 +87,10 @@ type ChatEqualityFields = {
   createdOn: Date;
   updatedOn?: Date;
   deletedOn?: Date;
-  content: string;
+  content?: string;
   fileIds?: string[];
+  addedParticipants?: ChatParticipant[];
+  removedParticipants?: ChatParticipant[];
 };
 
 export type {

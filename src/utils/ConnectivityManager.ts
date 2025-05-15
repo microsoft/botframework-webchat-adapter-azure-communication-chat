@@ -1,7 +1,7 @@
 import { ChatClient, ChatThreadClient } from '@azure/communication-chat';
 import { Logger, LogLevel } from '../log/Logger';
 import { LogEvent } from '../types/LogTypes';
-import { delay } from './Common';
+import { delay } from './MessageComparison';
 import packageInfo from '../../package.json';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../types/ErrorEventTypes';

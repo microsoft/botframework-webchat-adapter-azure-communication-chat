@@ -14,5 +14,8 @@ export type ACSDirectLineActivity = IDirectLineActivity & {
     type?: string;
     uploadedFiles?: IUploadedFile[];
     metadata?: Record<string, string>;
+    streamId?: string;
+    streamSequence?: number;
+    streamType?: 'start' | 'informative' | 'streaming' | 'final';
   };
 };

@@ -1,11 +1,11 @@
 import { ACSAdapterState, StateKey } from '../../models/ACSAdapterState';
 import { BOT_ADAPTIVE_CARD_METADATA_KEY, BOT_ADAPTIVE_CARD_METADATA_VALUE } from '../../types';
-import { ChatClient, ChatMessageReceivedEvent } from '@azure/communication-chat';
+import { ChatClient, ChatMessageReceivedEvent, StreamingMessageMetadata } from '@azure/communication-chat';
 import { CommunicationIdentifier, CommunicationUserIdentifier } from '@azure/communication-common';
 import { LogLevel, Logger } from '../../log/Logger';
 import { downloadAttachments, getAttachmentSizes, getAttachments, getIdFromIdentifier } from '../ingressHelpers';
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
-import { ActivityType } from '../../types/DirectLineTypes';
+import { ActivityType, DIRECT_LINE_ACTIVITY_ENTITIES_MESSAGE_STREAMING_VALUE } from '../../types/DirectLineTypes';
 import { AdapterOptions } from '../../types/AdapterTypes';
 import { AsyncMapper } from '../../types/AsyncMapper';
 import { Constants } from '../../Constants';
@@ -19,23 +19,28 @@ import uniqueId from '../../utils/uniqueId';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
 
+export interface ChatEventMessage {
+  messageId: string;
+  content: string;
+  createdOn: Date;
+  sender: CommunicationIdentifier;
+  senderDisplayName: string;
+  currentUserId: string;
+  threadId: string;
+  metadata?: Record<string, string>;
+  tags?: string;
+  sequenceId?: string;
+  streamingMetadata?: StreamingMessageMetadata;
+  files?: File[];
+}
+
 export async function convertMessageToActivity(
   eventManager: EventManager,
-  messageId: string,
-  content: string,
-  createdOn: Date,
-  sender: CommunicationIdentifier,
-  senderDisplayName: string,
-  currentUserId: string,
-  threadId: string,
+  eventMessage: ChatEventMessage,
   enableAdaptiveCards?: boolean,
-  enableMessageErrorHandler?: boolean,
-  metadata?: Record<string, string>,
-  files?: File[],
-  tags?: string,
-  sequenceId?: string
+  enableMessageErrorHandler?: boolean
 ): Promise<ACSDirectLineActivity> {
-  const senderUserId = getIdFromIdentifier(sender);
+  const senderUserId = getIdFromIdentifier(eventMessage.sender);
 
   let attachmentsData: any[];
   let attachmentSizes: number[];
@@ -45,10 +50,12 @@ export async function convertMessageToActivity(
   let attachmentLayout: string;
 
   // If adaptive cards are enabled, check if this is an adaptive card
-  const botContentType: string = metadata ? metadata[`${BOT_ADAPTIVE_CARD_METADATA_KEY}`] : undefined;
+  const botContentType: string = eventMessage.metadata
+    ? eventMessage.metadata[`${BOT_ADAPTIVE_CARD_METADATA_KEY}`]
+    : undefined;
   if (botContentType === BOT_ADAPTIVE_CARD_METADATA_VALUE) {
     try {
-      const acsMessageObject = JSON.parse(content);
+      const acsMessageObject = JSON.parse(eventMessage.content);
       if (enableAdaptiveCards && acsMessageObject.attachments) {
         attachmentsData = [];
         attachmentsData = attachmentsData.concat(acsMessageObject.attachments);
@@ -61,11 +68,11 @@ export async function convertMessageToActivity(
       Logger.logEvent(LogLevel.ERROR, {
         Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
         Description: errorMessage,
-        ACSRequesterUserId: currentUserId,
-        MessageSender: (sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: createdOn.toISOString(),
-        ChatThreadId: threadId,
-        ChatMessageId: messageId,
+        ACSRequesterUserId: eventMessage.currentUserId,
+        MessageSender: (eventMessage.sender as CommunicationUserIdentifier).communicationUserId,
+        TimeStamp: eventMessage.createdOn.toISOString(),
+        ChatThreadId: eventMessage.threadId,
+        ChatMessageId: eventMessage.messageId,
         ExceptionDetails: exception
       });
       ErrorEventSubscriber.notifyErrorEvent({
@@ -73,24 +80,24 @@ export async function convertMessageToActivity(
         ErrorMessage: exception.message,
         ErrorStack: exception.stack,
         ErrorDetails: (exception as any)?.details,
-        Timestamp: createdOn.toISOString(),
+        Timestamp: eventMessage.createdOn.toISOString(),
         AcsChatDetails: {
-          MessageId: messageId,
-          ThreadId: threadId,
-          MessageSenderId: (sender as CommunicationUserIdentifier).communicationUserId,
-          RequesterUserId: currentUserId
+          MessageId: eventMessage.messageId,
+          ThreadId: eventMessage.threadId,
+          MessageSenderId: (eventMessage.sender as CommunicationUserIdentifier).communicationUserId,
+          RequesterUserId: eventMessage.currentUserId
         },
         AdditionalParams: {
-          SenderDisplayName: senderDisplayName,
-          MessageText: content,
-          Metadata: metadata
+          SenderDisplayName: eventMessage.senderDisplayName,
+          MessageText: eventMessage.content,
+          Metadata: eventMessage.metadata
         }
       });
       if (enableMessageErrorHandler) {
         const error = new Error(errorMessage);
         (error as any).details = {
           type: 'MESSAGE_PARSING_FAILED',
-          actualMessage: content
+          actualMessage: eventMessage.content
         };
         eventManager.handleError(error);
       }
@@ -98,22 +105,22 @@ export async function convertMessageToActivity(
   } else {
     // If this is not an adaptive card then set the text content
     // For adaptive cards the message content is a JSON payload, we should not send the raw data as content
-    textData = content;
+    textData = eventMessage.content;
   }
 
-  if (files && !attachmentsData) {
-    attachmentsData = await getAttachments(files);
-    attachmentSizes = getAttachmentSizes(files);
+  if (eventMessage.files && !attachmentsData) {
+    attachmentsData = await getAttachments(eventMessage.files);
+    attachmentSizes = getAttachmentSizes(eventMessage.files);
   }
 
-  let clientActivityID = getClientId(messageId);
+  let clientActivityID = getClientId(eventMessage.messageId);
   if (clientActivityID === undefined) {
-    clientActivityID = metadata?.clientActivityId;
+    clientActivityID = eventMessage.metadata?.clientActivityId;
   }
 
   let sequenceIdAsANumber = undefined;
-  if (sequenceId && Math.sign(parseInt(sequenceId)) > 0) {
-    sequenceIdAsANumber = parseInt(sequenceId);
+  if (eventMessage.sequenceId && Math.sign(parseInt(eventMessage.sequenceId)) > 0) {
+    sequenceIdAsANumber = parseInt(eventMessage.sequenceId);
   }
 
   const activity: ACSDirectLineActivity = {
@@ -124,26 +131,39 @@ export async function convertMessageToActivity(
       attachmentSizes: attachmentSizes,
       fromUserId: senderUserId,
       clientActivityID: clientActivityID,
-      messageId,
+      messageId: eventMessage.messageId,
       state: 'sent',
-      tags: tags,
-      metadata: metadata
+      tags: eventMessage.metadata?.tags,
+      metadata: eventMessage.metadata
     },
-    conversation: { id: threadId },
+    conversation: { id: eventMessage.threadId },
     from: {
       id: senderUserId,
-      name: senderDisplayName ? senderDisplayName : undefined,
-      role: senderUserId === currentUserId ? Role.User : Role.Bot
+      name: eventMessage.senderDisplayName ? eventMessage.senderDisplayName : undefined,
+      role: senderUserId === eventMessage.currentUserId ? Role.User : Role.Bot
     },
-    id: messageId ? messageId : uniqueId(),
+    id: eventMessage.messageId ? eventMessage.messageId : uniqueId(),
     text: textData,
-    timestamp: new Date(createdOn).toISOString(),
+    timestamp: new Date(eventMessage.createdOn).toISOString(),
     type: ActivityType.Message,
-    messageid: messageId ? messageId : '',
+    messageid: eventMessage.messageId ? eventMessage.messageId : '',
     value: valueData,
     suggestedActions: suggestedActions,
     attachmentLayout: attachmentLayout
   };
+
+  if (eventMessage.streamingMetadata) {
+    activity.channelData.streamType = eventMessage.streamingMetadata.streamingMessageType;
+    activity.channelData.streamId = eventMessage.messageId;
+
+    activity.entities = [
+      {
+        type: DIRECT_LINE_ACTIVITY_ENTITIES_MESSAGE_STREAMING_VALUE,
+        streamType: eventMessage.streamingMetadata.streamingMessageType,
+        streamId: eventMessage.messageId
+      }
+    ];
+  }
 
   return activity;
 }
@@ -237,22 +257,26 @@ export default function createUserMessageToDirectLineActivityMapper({
         }
       }
     }
+    const eventMessage: ChatEventMessage = {
+      messageId: event.id,
+      content: event.message,
+      createdOn: event.createdOn,
+      sender: event.sender,
+      senderDisplayName: event.senderDisplayName,
+      currentUserId,
+      threadId: event.threadId,
+      metadata: metadata,
+      tags: event.metadata?.tags,
+      sequenceId: event.id,
+      streamingMetadata: event.streamingMetadata,
+      files
+    };
 
     return await convertMessageToActivity(
       eventManager,
-      event.id,
-      event.message,
-      event.createdOn,
-      event.sender,
-      event.senderDisplayName,
-      currentUserId,
-      event.threadId,
+      eventMessage,
       options?.enableAdaptiveCards,
-      options?.enableMessageErrorHandler,
-      metadata,
-      files,
-      event.metadata?.tags,
-      event.id
+      options?.enableMessageErrorHandler
     );
   };
 }
