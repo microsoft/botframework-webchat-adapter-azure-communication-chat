@@ -10,9 +10,9 @@ import EventManager from '../../utils/EventManager';
 import { GetStateFunction } from '../../types/AdapterTypes';
 import { IFileManager } from '../../types/FileManagerTypes';
 import { LogEvent } from '../../types/LogTypes';
-import { convertMessageToActivity, ChatEventMessage } from './createUserMessageToDirectLineActivityMapper';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
+import { ChatEventMessage, convertMessageToActivity } from '../../utils/ConvertMessageUtils';
 
 export function createHistoryAttachmentMessageToDirectLineActivityMapper({
   getState
@@ -99,7 +99,8 @@ export default function createHistoryMessageToDirectLineActivityMapper({
         },
         AdditionalParams: {
           MessageDetails: message
-        }
+        },
+        CorrelationVector: exception?.request?.headers?.get('ms-cv')
       });
       if (options?.enableMessageErrorHandler) {
         const errorMessage = 'Failed to download attachments.';
@@ -132,6 +133,8 @@ const createEventMessage = (
     messageId: message.id,
     content: message.content?.message,
     createdOn: message.createdOn,
+    editedOn: message.editedOn,
+    deletedOn: message.deletedOn,
     sender: message.sender,
     senderDisplayName: message.senderDisplayName,
     currentUserId,

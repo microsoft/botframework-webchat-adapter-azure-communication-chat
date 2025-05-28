@@ -1,8 +1,10 @@
-import { ChatClient, ChatParticipant, CreateChatThreadRequest } from '@azure/communication-chat';
+import { ChatClient, ChatParticipant, CreateChatThreadRequest, ChatClientOptions } from '@azure/communication-chat';
 import { getProxyToken, getThreadId } from '../utils/UrlUtils';
+import { CorrelationVectorV2 } from '../utils/CorrelationVectorUtils';
 
 import { AzureCommunicationTokenCredential } from '@azure/communication-common';
 import { CommunicationIdentityClient } from '@azure/communication-identity';
+import { PipelinePolicy, PipelineRequest, SendRequest, PipelineResponse } from '@azure/core-rest-pipeline';
 
 // This logic should be implemented in Server side for production code which includes
 // Thread management logic(A proxy token maintained in memory) for creating thread/add users to thread
@@ -84,6 +86,14 @@ const createUserToken = async (): Promise<UserTokenResponse> => {
   return returnJson;
 };
 
+const createCorrelationVectorPolicy = (): PipelinePolicy => ({
+  name: 'correlationVectorPolicy',
+  sendRequest: async (request: PipelineRequest, next: SendRequest): Promise<PipelineResponse> => {
+    request.headers.set('ms-cv', CorrelationVectorV2());
+    return next(request);
+  }
+});
+
 export const threadInitialize = async (): Promise<{
   userId: string;
   token: string;
@@ -103,7 +113,22 @@ export const threadInitialize = async (): Promise<{
 
   const proxyUserToken = getProxyToken();
   let threadId = getThreadId();
-  const chatClient: ChatClient = new ChatClient(environmentUrl, new AzureCommunicationTokenCredential(token));
+
+  // setup pipeline policy https://github.com/Azure/azure-sdk-for-js/blob/main/sdk/core/core-rest-pipeline/documentation/pipeline.md
+  const chatClientOptions: ChatClientOptions = {
+    additionalPolicies: [
+      {
+        policy: createCorrelationVectorPolicy(),
+        position: 'perCall'
+      }
+    ]
+  };
+
+  const chatClient: ChatClient = new ChatClient(
+    environmentUrl,
+    new AzureCommunicationTokenCredential(token),
+    chatClientOptions
+  );
 
   // If there is no proxy token/exsting thread, get one, and add the ACS user to the thread
   if (threadId === null || proxyUserToken === null) {

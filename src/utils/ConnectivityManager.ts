@@ -51,7 +51,8 @@ export default class ConnectivityManager {
             ErrorMessage: exception?.message,
             ErrorStack: exception?.stack,
             ErrorDetails: (exception as any)?.details,
-            Timestamp: new Date().toISOString()
+            Timestamp: new Date().toISOString(),
+            CorrelationVector: exception?.request?.headers?.get('ms-cv')
           });
           return false;
         }

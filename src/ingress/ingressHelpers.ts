@@ -166,6 +166,7 @@ export interface ProcessChatMessageEventProps {
   message: string;
   createdOn: Date;
   editedOn?: Date;
+  deletedOn?: Date;
   metadata?: { [key: string]: any };
   sender: CommunicationIdentifierKind;
   threadId: string;
@@ -190,7 +191,7 @@ export const cacheTextMessageIfNeeded = (
 ): boolean => {
   const isProcessed = checkDuplicateMessage(messageCache, event.id, {
     content: event.message,
-    createdOn: event.createdOn,
+    deletedOn: event.deletedOn,
     updatedOn: event.editedOn,
     fileIds: fileManager?.getFileIds(event.metadata)
   });
@@ -205,8 +206,8 @@ export const cacheTextMessageIfNeeded = (
     });
     messageCache.set(event.id, {
       content: event.message,
-      createdOn: event.createdOn,
       updatedOn: event.editedOn,
+      deletedOn: event.deletedOn,
       fileIds: fileManager?.getFileIds(event.metadata)
     });
   }
@@ -222,22 +223,20 @@ export const isDuplicateMessage = (
     case 'text':
       return checkDuplicateMessage(messageCache, message.id, {
         content: message.content.message,
-        createdOn: message.createdOn,
         updatedOn: message.editedOn,
+        deletedOn: message.deletedOn,
         fileIds: fileManager?.getFileIds(message.metadata)
       });
     case 'participantAdded': {
       const key = createParticipantMessageKeyWithMessage(message);
       return checkDuplicateParticipantMessage(messageCache, key, {
-        addedParticipants: message.content.participants,
-        createdOn: message.createdOn
+        addedParticipants: message.content.participants
       });
     }
     case 'participantRemoved': {
       const key = createParticipantMessageKeyWithMessage(message);
       return checkDuplicateParticipantMessage(messageCache, key, {
-        removedParticipants: message.content.participants,
-        createdOn: message.createdOn
+        removedParticipants: message.content.participants
       });
     }
     default:
@@ -255,8 +254,8 @@ export const updateMessageCacheWithMessage = (
     case 'text': {
       messageCache.set(message.id, {
         content: message.content.message,
-        createdOn: message.createdOn,
         updatedOn: message.editedOn,
+        deletedOn: message.deletedOn,
         fileIds: fileManager?.getFileIds(message.metadata)
       });
       break;
@@ -264,16 +263,14 @@ export const updateMessageCacheWithMessage = (
     case 'participantAdded': {
       const key = createParticipantMessageKeyWithMessage(message);
       messageCache.set(key, {
-        addedParticipants: message.content.participants,
-        createdOn: message.createdOn
+        addedParticipants: message.content.participants
       });
       break;
     }
     case 'participantRemoved': {
       const key = createParticipantMessageKeyWithMessage(message);
       messageCache.set(key, {
-        removedParticipants: message.content.participants,
-        createdOn: message.createdOn
+        removedParticipants: message.content.participants
       });
       break;
     }
@@ -291,14 +288,12 @@ export const cacheParticipantAddedEventIfNeeded = (
 ): boolean => {
   const key = createParticipantMessageKeyWithParticipantsEvent(event);
   const isProcessed = checkDuplicateParticipantMessage(messageCache, key, {
-    addedParticipants: event.participantsAdded,
-    createdOn: event.addedOn
+    addedParticipants: event.participantsAdded
   });
   if (!isProcessed) {
     logProcessingParticipantAddedEvent(getState, event);
     messageCache.set(key, {
-      addedParticipants: event.participantsAdded,
-      createdOn: event.addedOn
+      addedParticipants: event.participantsAdded
     });
   }
   return isProcessed;
@@ -311,14 +306,12 @@ export const cacheParticipantRemovedEventIfNeeded = (
 ): boolean => {
   const key = createParticipantMessageKeyWithParticipantsEvent(event);
   const isProcessed = checkDuplicateParticipantMessage(messageCache, key, {
-    removedParticipants: event.participantsRemoved,
-    createdOn: event.removedOn
+    removedParticipants: event.participantsRemoved
   });
   if (!isProcessed) {
     logProcessingParticipantRemovedEvent(getState, event);
     messageCache.set(key, {
-      removedParticipants: event.participantsRemoved,
-      createdOn: event.removedOn
+      removedParticipants: event.participantsRemoved
     });
   }
   return isProcessed;

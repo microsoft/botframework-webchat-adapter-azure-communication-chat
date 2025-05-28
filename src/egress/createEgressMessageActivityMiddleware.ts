@@ -169,6 +169,7 @@ export default function createEgressMessageActivityMiddleware(): EgressMiddlewar
           ClientActivityId: activity?.channelData.clientActivityID as string
         });
       } catch (exception) {
+        const httpRequest = exception?.request;
         Logger.logEvent(LogLevel.ERROR, {
           Event: LogEvent.ACS_ADAPTER_SEND_MESSAGE_FAILED,
           Description: `Send message failed.`,
@@ -194,8 +195,10 @@ export default function createEgressMessageActivityMiddleware(): EgressMiddlewar
           AdditionalParams: {
             activity,
             sendMessageRequest,
-            sendMessageOptions
-          }
+            sendMessageOptions,
+            httpRequest
+          },
+          CorrelationVector: exception?.request?.headers?.get('ms-cv')
         });
         eventManager.handleError(exception);
       }

@@ -1,7 +1,7 @@
 import { ACSAdapterState, StateKey } from '../../models/ACSAdapterState';
 import { ActivityType, IDirectLineActivity } from '../../types/DirectLineTypes';
 import { ChatClient, ChatMessageEditedEvent } from '@azure/communication-chat';
-import { IFileManager, LogLevel, Logger } from '../..';
+import { IFileManager } from '../..';
 import { downloadAttachments, getAttachmentSizes, getAttachments, getIdFromIdentifier } from '../ingressHelpers';
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
 import { AsyncMapper } from '../../types/AsyncMapper';
@@ -9,11 +9,11 @@ import { CommunicationUserIdentifier } from '@azure/communication-common';
 import { Constants } from '../../Constants';
 import EventManager from '../../utils/EventManager';
 import { GetStateFunction } from '../../types/AdapterTypes';
-import { LogEvent } from '../../types/LogTypes';
 import { Role } from '../../types/DirectLineTypes';
 import uniqueId from '../../utils/uniqueId';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
+import { logEditEventFailedMetadataParsing } from '../../utils/LoggerUtils';
 
 export default function createEditedMessageToDirectLineActivityMapper({
   getState
@@ -27,15 +27,6 @@ export default function createEditedMessageToDirectLineActivityMapper({
 
     if (!chatClient) {
       const errorMessage = 'ACS Adapter: Failed to ingress edited message without an active chatClient.';
-      Logger.logEvent(LogLevel.ERROR, {
-        Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
-        Description: errorMessage,
-        ACSRequesterUserId: getState(StateKey.UserId),
-        MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: event.editedOn.toISOString(),
-        ChatThreadId: event.threadId,
-        ChatMessageId: event.id
-      });
       throw new Error(errorMessage);
     }
 
@@ -44,7 +35,10 @@ export default function createEditedMessageToDirectLineActivityMapper({
     const activity: IDirectLineActivity = {
       channelId: Constants.ACS_CHANNEL,
       channelData: {
-        'webchat:sequence-id': parseInt(event.id)
+        'webchat:sequence-id': parseInt(event.id),
+        additionalMessageMetadata: {
+          editedOn: event.editedOn.toISOString()
+        }
       },
       conversation: { id: getState(StateKey.UserId) },
       from: {
@@ -55,7 +49,7 @@ export default function createEditedMessageToDirectLineActivityMapper({
       messageid: event.id,
       id: event.id ? event.id : uniqueId(),
       text: event.message,
-      timestamp: event.editedOn.toISOString(),
+      timestamp: event.createdOn.toISOString(),
       type: ActivityType.Message
     };
 
@@ -76,16 +70,7 @@ export default function createEditedMessageToDirectLineActivityMapper({
           attachmentSizes = getAttachmentSizes(files);
         }
       } catch (exception) {
-        Logger.logEvent(LogLevel.ERROR, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-          Description: 'Failed to parse ChatMessage metadata',
-          ACSRequesterUserId: getState(StateKey.UserId),
-          MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: event.editedOn.toISOString(),
-          ChatThreadId: event.threadId,
-          ChatMessageId: event.id,
-          ExceptionDetails: exception
-        });
+        logEditEventFailedMetadataParsing(event, exception, getState);
         ErrorEventSubscriber.notifyErrorEvent({
           ErrorType: AdapterErrorEventType.EDITED_MESSAGE_ATTACHMENT_DOWNLOAD_FAILED,
           ErrorMessage: exception.message,
@@ -100,7 +85,8 @@ export default function createEditedMessageToDirectLineActivityMapper({
           },
           AdditionalParams: {
             MessageEditedEvent: event
-          }
+          },
+          CorrelationVector: exception?.request?.headers?.get('ms-cv')
         });
         eventManager.handleError(exception);
       }

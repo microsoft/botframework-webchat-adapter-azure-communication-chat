@@ -20,16 +20,22 @@ export const checkDuplicateMessage = (
   const existingProcessedMessage: ChatEqualityFields = messageCache?.get(messageId);
   if (existingProcessedMessage) {
     const isContentSame = existingProcessedMessage.content === receivedChatMessage.content;
-    const isUpdatedMessage = existingProcessedMessage.updatedOn !== receivedChatMessage.updatedOn;
+    const isUpdatedMessage = !areDatesEqualIgnoringMilliseconds(
+      existingProcessedMessage.updatedOn,
+      receivedChatMessage.updatedOn
+    );
+    const isSameDeletedOn = areDatesEqualIgnoringMilliseconds(
+      existingProcessedMessage.deletedOn,
+      receivedChatMessage.deletedOn
+    );
     const existingFileIds = existingProcessedMessage.fileIds ? new Set(existingProcessedMessage.fileIds) : undefined;
     const receivedFileIds = receivedChatMessage.fileIds ? new Set(receivedChatMessage.fileIds) : undefined;
     const hasSameFileIds =
       (!existingFileIds && !receivedFileIds) ||
       (existingFileIds.size === receivedFileIds.size &&
         [...existingFileIds].every((fileId) => receivedFileIds.has(fileId)));
-    return isContentSame && !isUpdatedMessage && hasSameFileIds;
+    return isContentSame && !isUpdatedMessage && hasSameFileIds && isSameDeletedOn;
   }
-
   return false;
 };
 
@@ -91,10 +97,7 @@ const hasSameParticipants = (
     if (
       !existingParticipant ||
       receivedParticipant.displayName !== existingParticipant.displayName ||
-      !isSameShareHistoryTime(
-        receivedParticipant.shareHistoryTime.toISOString().substring(0, 19),
-        existingParticipant.shareHistoryTime.toISOString().substring(0, 19)
-      )
+      !areDatesEqualIgnoringMilliseconds(receivedParticipant.shareHistoryTime, existingParticipant.shareHistoryTime)
     ) {
       return false;
     }
@@ -104,10 +107,10 @@ const hasSameParticipants = (
 };
 
 // Helper to compare Date objects or undefined values
-const isSameShareHistoryTime = (time1?: string, time2?: string): boolean => {
+const areDatesEqualIgnoringMilliseconds = (time1?: Date, time2?: Date): boolean => {
   if (!time1 && !time2) return true;
   if (!time1 || !time2) return false;
-  return time1 === time2;
+  return formatDateWithSecondsPrecision(time1) === formatDateWithSecondsPrecision(time2);
 };
 
 /**
@@ -124,7 +127,7 @@ export const createParticipantMessageKeyWithMessage = (message: ChatMessage): st
   }
   return createParticipantMessageKey(
     (message.content?.initiator as CommunicationUserIdentifier).communicationUserId,
-    message.createdOn.toISOString().substring(0, 19),
+    message.createdOn,
     message.content.participants
   );
 };
@@ -140,17 +143,26 @@ export const createParticipantMessageKeyWithParticipantsEvent = (
   if (isParticipantsAddedEvent(event)) {
     return createParticipantMessageKey(
       (event.addedBy.id as CommunicationUserIdentifier).communicationUserId,
-      event.addedOn.toISOString().substring(0, 19),
+      event.addedOn,
       event.participantsAdded
     );
   } else if (isParticipantsRemovedEvent(event)) {
     return createParticipantMessageKey(
       (event.removedBy.id as CommunicationUserIdentifier).communicationUserId,
-      event.removedOn.toISOString().substring(0, 19),
+      event.removedOn,
       event.participantsRemoved
     );
   }
   throw new Error('Event does not contain participants information');
+};
+
+/**
+ * Formats a date as ISO string with seconds precision (no milliseconds)
+ * @param date The date to format
+ * @returns ISO string representation with seconds precision (YYYY-MM-DDTHH:mm:ss)
+ */
+const formatDateWithSecondsPrecision = (date: Date): string => {
+  return date.toISOString().substring(0, 19);
 };
 
 /**
@@ -161,11 +173,7 @@ export const createParticipantMessageKeyWithParticipantsEvent = (
  * @param participants - The list of participants.
  * @returns A string key composed of the timestamp, initiator ID, and sorted participant IDs.
  */
-const createParticipantMessageKey = (
-  initiatorId: string,
-  timestamp: string,
-  participants: ChatParticipant[]
-): string => {
+const createParticipantMessageKey = (initiatorId: string, timestamp: Date, participants: ChatParticipant[]): string => {
   const participantIds = participants
     .map((p) => (p.id as CommunicationUserIdentifier).communicationUserId)
     .sort()
@@ -173,7 +181,7 @@ const createParticipantMessageKey = (
 
   // Hash the participant IDs to decrease string length and ensure uniqueness
   const participantsHash = hashString(participantIds);
-  return `${timestamp}_${initiatorId}_${participantsHash}`;
+  return `${formatDateWithSecondsPrecision(timestamp)}_${initiatorId}_${participantsHash}`;
 };
 
 // Simple string hash function
