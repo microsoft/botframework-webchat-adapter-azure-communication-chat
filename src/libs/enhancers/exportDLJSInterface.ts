@@ -102,7 +102,9 @@ export default function exportDLJSInterface<TAdapterState extends AdapterState>(
           adapter.getReadyState() === ReadyState.CLOSED
             ? ConnectionStatus.FailedToConnect
             : ConnectionStatus.Connecting;
-        connectionStatusObserver.next(connectionStatus);
+        if (connectionStatusObserver) {
+          connectionStatusObserver.next(connectionStatus);
+        }
         adapter.setState(StateKey.WebChatStatus, connectionStatus);
       });
 

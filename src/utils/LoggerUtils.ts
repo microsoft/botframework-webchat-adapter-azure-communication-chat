@@ -3,6 +3,8 @@ import { Logger, LogLevel } from '../log/Logger';
 import { LogEvent } from '../types/LogTypes';
 import {
   ChatMessage,
+  ChatMessageDeletedEvent,
+  ChatMessageEditedEvent,
   ChatMessageReceivedEvent,
   ChatParticipant,
   ParticipantsAddedEvent,
@@ -11,6 +13,7 @@ import {
 } from '@azure/communication-chat';
 import { ACSAdapterState, StateKey } from '../models/ACSAdapterState';
 import { GetStateFunction } from '../types/AdapterTypes';
+import { ChatEventMessage } from './ConvertMessageUtils';
 
 export const logConvertStreamingMessageChunkEvent = (event: StreamingChatMessageChunkReceivedEvent): void => {
   Logger.logEvent(LogLevel.INFO, {
@@ -433,5 +436,145 @@ export const logUnsupportedMessageType = (message: ChatMessage): void => {
     Event: LogEvent.UNSUPPORTED_MESSAGE_TYPE,
     Description: `Message with ${message.id} has unsupported message type: ${message.type}`,
     TimeStamp: new Date().toISOString()
+  });
+};
+
+export const logEditEventIngressFailed = (
+  event: ChatMessageEditedEvent,
+  errorMessage: string,
+  getState: GetStateFunction<ACSAdapterState>
+): void => {
+  Logger.logEvent(LogLevel.ERROR, {
+    Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
+    Description: errorMessage,
+    ACSRequesterUserId: getState(StateKey.UserId),
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: event.editedOn.toISOString(),
+    ChatThreadId: event.threadId,
+    ChatMessageId: event.id
+  });
+};
+
+export const logDeletedMessageEventIngressFailed = (
+  event: ChatMessageDeletedEvent,
+  errorMessage: string,
+  getState: GetStateFunction<ACSAdapterState>
+): void => {
+  Logger.logEvent(LogLevel.ERROR, {
+    Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
+    Description: errorMessage,
+    ACSRequesterUserId: getState(StateKey.UserId),
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: event.deletedOn.toISOString(),
+    ChatThreadId: event.threadId,
+    ChatMessageId: event.id
+  });
+};
+
+export const logSkipProcessedEditEvent = (
+  event: ChatMessageEditedEvent,
+  getState: GetStateFunction<ACSAdapterState>
+): void => {
+  Logger.logEvent(LogLevel.INFO, {
+    Event: LogEvent.ACS_SKIP_EDITED_MESSAGE,
+    Description: 'ACS Adapter: Skipping edited RTN message, already processed',
+    TimeStamp: new Date().toISOString(),
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    ChatThreadId: getState(StateKey.ThreadId),
+    ChatMessageId: event.id
+  });
+};
+
+export const logSkipProcessedDeletedMessageEvent = (
+  event: ChatMessageDeletedEvent,
+  getState: GetStateFunction<ACSAdapterState>
+): void => {
+  Logger.logEvent(LogLevel.INFO, {
+    Event: LogEvent.ACS_SKIP_DELETED_MESSAGE,
+    Description: 'ACS Adapter: Skipping deleted message RTN, already processed',
+    TimeStamp: new Date().toISOString(),
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    ChatThreadId: getState(StateKey.ThreadId),
+    ChatMessageId: event.id
+  });
+};
+
+export const logMessageEditEventReceived = (event: ChatMessageEditedEvent): void => {
+  Logger.logEvent(LogLevel.DEBUG, {
+    Event: LogEvent.MESSAGE_EDIT_RECEIVED,
+    Description: `ACS Adapter: Received a message edit event with id ${event.id}`,
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: event.editedOn.toISOString(),
+    ChatThreadId: event.threadId,
+    ChatMessageId: event.id
+  });
+};
+
+export const logMessageDeletedEventReceived = (event: ChatMessageDeletedEvent): void => {
+  Logger.logEvent(LogLevel.DEBUG, {
+    Event: LogEvent.MESSAGE_DELETED_RECEIVED,
+    Description: `ACS Adapter: Received a message delete event with id ${event.id}`,
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: event.deletedOn.toISOString(),
+    ChatThreadId: event.threadId,
+    ChatMessageId: event.id
+  });
+};
+
+export const logConvertEditedMessageEvent = (event: ChatMessageEditedEvent): void => {
+  Logger.logEvent(LogLevel.INFO, {
+    Event: LogEvent.ACS_ADAPTER_CONVERT_EDITED_MESSAGE,
+    Description: 'ACS Adapter: convert edited message',
+    CustomProperties: event,
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: event.editedOn.toISOString(),
+    ChatThreadId: event.threadId,
+    ChatMessageId: event.id
+  });
+};
+
+export const logConvertDeletedMessageEvent = (event: ChatMessageDeletedEvent): void => {
+  Logger.logEvent(LogLevel.INFO, {
+    Event: LogEvent.ACS_ADAPTER_CONVERT_DELETED_MESSAGE,
+    Description: 'ACS Adapter: convert edited deleted message event',
+    CustomProperties: event,
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: event.deletedOn.toISOString(),
+    ChatThreadId: event.threadId,
+    ChatMessageId: event.id
+  });
+};
+
+export const logConvertFetchedMessageFailed = (
+  eventMessage: ChatEventMessage,
+  errorMessage: string,
+  exception: Error
+): void => {
+  Logger.logEvent(LogLevel.ERROR, {
+    Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
+    Description: errorMessage,
+    ACSRequesterUserId: eventMessage.currentUserId,
+    MessageSender: (eventMessage.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: eventMessage.createdOn.toISOString(),
+    ChatThreadId: eventMessage.threadId,
+    ChatMessageId: eventMessage.messageId,
+    ExceptionDetails: exception
+  });
+};
+
+export const logEditEventFailedMetadataParsing = (
+  event: ChatMessageEditedEvent,
+  exception: Error,
+  getState: GetStateFunction<ACSAdapterState>
+): void => {
+  Logger.logEvent(LogLevel.ERROR, {
+    Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
+    Description: 'Failed to parse ChatMessage metadata',
+    ACSRequesterUserId: getState(StateKey.UserId),
+    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+    TimeStamp: event.editedOn.toISOString(),
+    ChatThreadId: event.threadId,
+    ChatMessageId: event.id,
+    ExceptionDetails: exception
   });
 };

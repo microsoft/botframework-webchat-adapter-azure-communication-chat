@@ -1,1 +1,0 @@
-{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../../src/egress/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,eAAe,EAAE,cAAc,EAAE,MAAM,uBAAuB,CAAC;AAExE,OAAO,EAAE,eAAe,EAAE,MAAM,2BAA2B,CAAC;AAC5D,OAAO,EAAE,qBAAqB,EAAE,MAAM,iCAAiC,CAAC;AAMxE,MAAM,CAAC,OAAO,UAAU,oBAAoB,CAC1C,cAAc,CAAC,EAAE,cAAc,GAC9B,eAAe,CAAC,qBAAqB,EAAE,eAAe,CAAC,CAQzD"}

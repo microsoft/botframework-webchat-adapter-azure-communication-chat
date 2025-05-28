@@ -96,7 +96,8 @@ export const createStreamingMessageChunkToDirectLineActivityMapper = ({
           },
           AdditionalParams: {
             MessageEditedEvent: event
-          }
+          },
+          CorrelationVector: exception?.request?.headers?.get('ms-cv')
         });
         eventManager.handleError(exception);
       }

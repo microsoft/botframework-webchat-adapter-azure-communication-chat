@@ -9,7 +9,8 @@ import {
   ParticipantsAddedEvent,
   ParticipantsRemovedEvent,
   TypingIndicatorReceivedEvent,
-  StreamingChatMessageChunkReceivedEvent
+  StreamingChatMessageChunkReceivedEvent,
+  ChatMessageDeletedEvent
 } from '@azure/communication-chat';
 import { LogLevel, Logger } from '../log/Logger';
 import { ACSDirectLineActivity } from '../models/ACSDirectLineActivity';
@@ -21,7 +22,6 @@ import EventManager, { CustomEvent } from '../utils/EventManager';
 import { LogEvent } from '../types/LogTypes';
 import Observable from 'core-js/features/observable';
 import { applySetStateMiddleware } from '../libs';
-import createEditedMessageToDirectLineActivityMapper from './mappers/createEditedMessageToDirectLineActivityMapper';
 import createErrorMessageToDirectLineActivityMapper from './mappers/createErrorMessageToDirectLineActivityMapper';
 import { createHistoryAttachmentMessageToDirectLineActivityMapper } from './mappers/createHistoryMessageToDirectLineActivityMapper';
 import createThreadDeleteToDirectLineActivityMapper from './mappers/createThreadDeleteToDirectLineActivityMapper';
@@ -67,7 +67,11 @@ import {
   logCacheParticipantRemovedEvent,
   logParticipantRemovedEventReceived,
   logParticipantRemovedEventAlreadyProcessed,
-  logProcessCachedParticipantsRemovedEvent
+  logProcessCachedParticipantsRemovedEvent,
+  logSkipProcessedEditEvent,
+  logMessageEditEventReceived,
+  logMessageDeletedEventReceived,
+  logSkipProcessedDeletedMessageEvent
 } from '../utils/LoggerUtils';
 import { convertStreamingMessageChunkEvent } from './eventconverters/StreamingMessageChunkReceivedEventConverter';
 import {
@@ -80,6 +84,7 @@ import {
   isParticipantsAddedEvent,
   isParticipantsRemovedEvent
 } from '../utils/MessageUtils';
+import { convertDeletedMessageEvent, convertEditedMessageEvent } from './eventconverters/MessageConverter';
 
 // Cached offsets for history messages' pagination
 let MessageHistoryCurrentPage: any = undefined;
@@ -132,22 +137,6 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
           MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
           TimeStamp: message.createdOn.toISOString(),
           ChatMessageId: message.id
-        });
-
-        return activity;
-      };
-
-      const convertEditedMessage = async (event: ChatMessageEditedEvent): Promise<void | ACSDirectLineActivity> => {
-        const activity = await createEditedMessageToDirectLineActivityMapper({ getState })()(event);
-
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_EDITED_MESSAGE,
-          Description: 'ACS Adapter: convert edited message',
-          CustomProperties: event,
-          MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: event.editedOn.toISOString(),
-          ChatThreadId: event.threadId,
-          ChatMessageId: event.id
         });
 
         return activity;
@@ -465,7 +454,8 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     Timestamp: new Date().toISOString(),
                     AcsChatDetails: {
                       ThreadId: getState(StateKey.ThreadId)
-                    }
+                    },
+                    CorrelationVector: exception?.request?.headers?.get('ms-cv')
                   });
                 } finally {
                   const statusCode = pollingException?.response?.status;
@@ -715,16 +705,33 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 }
               };
 
+              const onMessageDeleted = async (event: ChatMessageDeletedEvent): Promise<void> => {
+                if (event.threadId === getState(StateKey.ThreadId)) {
+                  logMessageDeletedEventReceived(event);
+
+                  const messageToCheck = { ...event, message: '' };
+                  const isProcessed = cacheTextMessageIfNeeded(
+                    messageCache,
+                    messageToCheck,
+                    getState,
+                    fileManager,
+                    LogEvent.ACS_PROCESSING_DELETED_MESSAGE
+                  );
+                  if (isProcessed) {
+                    logSkipProcessedDeletedMessageEvent(event, getState);
+                    return;
+                  }
+
+                  const activity = await convertDeletedMessageEvent(event, getState);
+                  if (activity) {
+                    next(activity);
+                  }
+                }
+              };
+
               const onMessageEdited = async (event: ChatMessageEditedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.MESSAGE_EDIT_RECEIVED,
-                    Description: `ACS Adapter: Received a message edit event with id ${event.id}`,
-                    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-                    TimeStamp: event.editedOn.toISOString(),
-                    ChatThreadId: event.threadId,
-                    ChatMessageId: event.id
-                  });
+                  logMessageEditEventReceived(event);
 
                   if (!fileManager) {
                     fileManager = getState(StateKey.FileManager);
@@ -737,18 +744,11 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     LogEvent.ACS_PROCESSING_EDITED_MESSAGE
                   );
                   if (isProcessed) {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_SKIP_EDITED_MESSAGE,
-                      Description: 'ACS Adapter: Skipping edited RTN message, already processed',
-                      TimeStamp: new Date().toISOString(),
-                      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ChatMessageId: event.id
-                    });
+                    logSkipProcessedEditEvent(event, getState);
                     return;
                   }
 
-                  const activity = await convertEditedMessage(event);
+                  const activity = await convertEditedMessageEvent(event, getState);
                   if (activity) {
                     next(activity);
                   }
@@ -856,6 +856,11 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 Event: LogEvent.REGISTER_ON_MESSAGE_EDIT,
                 Description: `ACS Adapter: Registering on message edit success`
               });
+              chatClient.on('chatMessageDeleted', onMessageDeleted);
+              Logger.logEvent(LogLevel.DEBUG, {
+                Event: LogEvent.REGISTER_ON_MESSAGE_DELETED,
+                Description: `ACS Adapter: Registering on message delete success`
+              });
               chatClient.on('chatThreadDeleted', onChatThreadDeleted);
               Logger.logEvent(LogLevel.DEBUG, {
                 Event: LogEvent.REGISTER_ON_THREAD_DELETED,
@@ -947,6 +952,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 chatClient.off('chatMessageReceived', onMessageReceived);
                 chatClient.off('typingIndicatorReceived', onTypingMessageReceived);
                 chatClient.off('chatMessageEdited', onMessageEdited);
+                chatClient.off('chatMessageDeleted', onMessageDeleted);
                 chatClient.off('participantsAdded', onParticipantsAdded);
                 chatClient.off('participantsRemoved', onParticipantsRemoved);
                 chatClient.off('chatThreadDeleted', onChatThreadDeleted);

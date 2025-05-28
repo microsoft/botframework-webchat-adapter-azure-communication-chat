@@ -63,7 +63,8 @@ export default function createEgressFileAttachmentMiddleware(): EgressMiddleware
           },
           AdditionalParams: {
             activity
-          }
+          },
+          CorrelationVector: exception?.request?.headers?.get('ms-cv')
         });
         eventManager.handleError(exception);
       }

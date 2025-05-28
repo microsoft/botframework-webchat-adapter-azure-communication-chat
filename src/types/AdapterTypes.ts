@@ -84,7 +84,6 @@ type AdapterEnhancer<TActivity, TAdapterState extends AdapterState> = (
 ) => AdapterCreator<TActivity, TAdapterState>;
 
 type ChatEqualityFields = {
-  createdOn: Date;
   updatedOn?: Date;
   deletedOn?: Date;
   content?: string;

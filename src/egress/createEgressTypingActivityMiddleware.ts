@@ -67,6 +67,7 @@ export default function createEgressTypingActivityMiddleware(): EgressMiddleware
           ChatThreadId: getState(StateKey.ThreadId)
         });
       } catch (exception) {
+        const httpRequest = exception?.request;
         Logger.logEvent(LogLevel.ERROR, {
           Event: LogEvent.ACS_ADAPTER_SEND_MESSAGE_FAILED,
           Description: `Send message failed.`,
@@ -90,8 +91,10 @@ export default function createEgressTypingActivityMiddleware(): EgressMiddleware
             RequesterUserId: getState(StateKey.UserId)
           },
           AdditionalParams: {
-            activity
-          }
+            activity,
+            httpRequest
+          },
+          CorrelationVector: exception?.request?.headers?.get('ms-cv')
         });
       }
     };

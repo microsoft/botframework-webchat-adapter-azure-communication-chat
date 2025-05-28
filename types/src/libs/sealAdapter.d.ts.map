@@ -1,1 +1,0 @@
-{"version":3,"file":"sealAdapter.d.ts","sourceRoot":"","sources":["../../../src/libs/sealAdapter.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,YAAY,EAAE,aAAa,EAAE,MAAM,uBAAuB,CAAC;AAE7E,MAAM,CAAC,OAAO,UAAU,WAAW,CAAC,SAAS,EAAE,aAAa,SAAS,YAAY,EAC/E,OAAO,EAAE,OAAO,CAAC,SAAS,EAAE,aAAa,CAAC,EAC1C,MAAM,EAAE,aAAa,GACpB,aAAa,CAAC,SAAS,EAAE,aAAa,CAAC,CAoBzC"}

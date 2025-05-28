@@ -105,7 +105,8 @@ export const SDKInit = async (
       AcsChatDetails: {
         RequesterUserId: id,
         ThreadId: id
-      }
+      },
+      CorrelationVector: exception?.request?.headers?.get('ms-cv')
     });
   }
 };
