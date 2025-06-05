@@ -1,8 +1,14 @@
 # Release History
 
+## 0.0.1-beta.4
+### Added
+- Add support for message deleted RTN.
+- Add `editedOn` and `deletedOn` fields support for message activities.
+- Update `timestamp` to be set to `event.createdOn` value for message edit RTN.
+
 ## 0.0.1-beta.3
 ### Added
-- Added support for real-time message streaming events.
+- Add support for real-time message streaming events.
 - Support for `participantAdded` and `participantRemoved` message types in both polled messages and messages loaded prior to web chat adapter initialization.
 
 ## 0.0.1-beta.2
