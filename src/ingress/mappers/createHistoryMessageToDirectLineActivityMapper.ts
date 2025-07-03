@@ -35,6 +35,7 @@ export function createHistoryAttachmentMessageToDirectLineActivityMapper({
         eventManager,
         eventMessage,
         options?.enableAdaptiveCards,
+        options?.enableAdaptiveCardsResponses,
         options?.enableMessageErrorHandler
       );
     };
@@ -118,6 +119,7 @@ export default function createHistoryMessageToDirectLineActivityMapper({
       eventManager,
       eventMessage,
       options?.enableAdaptiveCards,
+      options?.enableAdaptiveCardsResponses,
       options?.enableMessageErrorHandler
     );
   };

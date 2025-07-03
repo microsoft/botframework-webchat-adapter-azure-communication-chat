@@ -123,6 +123,7 @@ export default function createUserMessageToDirectLineActivityMapper({
       eventManager,
       eventMessage,
       options?.enableAdaptiveCards,
+      options?.enableAdaptiveCardsResponses,
       options?.enableMessageErrorHandler
     );
   };

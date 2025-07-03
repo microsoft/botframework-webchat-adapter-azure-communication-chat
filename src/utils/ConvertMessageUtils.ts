@@ -34,6 +34,7 @@ export async function convertMessageToActivity(
   eventManager: EventManager,
   eventMessage: ChatEventMessage,
   enableAdaptiveCards?: boolean,
+  enableAdaptiveCardsResponses = true,
   enableMessageErrorHandler?: boolean
 ): Promise<ACSDirectLineActivity> {
   const senderUserId = getIdFromIdentifier(eventMessage.sender);
@@ -57,8 +58,12 @@ export async function convertMessageToActivity(
         attachmentsData = attachmentsData.concat(acsMessageObject.attachments);
         attachmentLayout = acsMessageObject.attachmentLayout;
       }
-      suggestedActions = acsMessageObject ? acsMessageObject.suggestedActions : undefined;
-      textData = acsMessageObject ? acsMessageObject.text : undefined;
+      if (enableAdaptiveCardsResponses) {
+        // adaptive cards responses are sent as value in the message
+        valueData = acsMessageObject?.value;
+      }
+      suggestedActions = acsMessageObject?.suggestedActions;
+      textData = acsMessageObject?.text;
     } catch (exception) {
       const errorMessage = 'Valid JSON object is expected.';
       logConvertFetchedMessageFailed(eventMessage, errorMessage, exception);
