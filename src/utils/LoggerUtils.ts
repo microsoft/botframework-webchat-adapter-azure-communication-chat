@@ -578,3 +578,42 @@ export const logEditEventFailedMetadataParsing = (
     ExceptionDetails: exception
   });
 };
+
+export const logFileManagerFileDownloadFailed = (exception: Error): void => {
+  Logger.logEvent(LogLevel.ERROR, {
+    Event: LogEvent.FILEMANAGER_DOWNLOAD_FILE_FAILED,
+    Description: `Downloading attachment for message failed.`,
+    ExceptionDetails: exception
+  });
+};
+
+export const logSDKStartInitError = (
+  threadId: string,
+  requesterUserId: string,
+  description: string,
+  exception?: Error
+): void => {
+  Logger.logEvent(LogLevel.ERROR, {
+    Event: LogEvent.ACS_SDK_START_INIT_ERROR,
+    ChatThreadId: threadId,
+    ACSRequesterUserId: requesterUserId,
+    Description: description,
+    ExceptionDetails: exception
+  });
+};
+
+export const logSDKStartInit = (threadId: string, requesterUserId: string): void => {
+  Logger.logEvent(LogLevel.INFO, {
+    Event: LogEvent.ACS_SDK_START_INIT,
+    ChatThreadId: threadId,
+    ACSRequesterUserId: requesterUserId,
+    Description: `ACS Adapter: ACS Adapter start init.`
+  });
+};
+
+export const logSDKJoinThreadError = (): void => {
+  Logger.logEvent(LogLevel.ERROR, {
+    Event: LogEvent.ACS_SDK_JOINTHREAD_ERROR,
+    Description: `ACS Adapter: failed to join the thread.`
+  });
+};

@@ -6,6 +6,7 @@ import { ChatParticipant } from '@azure/communication-chat';
 
 interface AdapterOptions {
   enableAdaptiveCards?: boolean; // Whether to enable adaptive card payload in adapter(which will convert content payload into a json string)
+  enableAdaptiveCardsResponses?: boolean; // Whether to enable adaptive card responses when translating ACS messages and RTN to activities. Default is true.
   enableThreadMemberUpdateNotification?: boolean; // Whether to enable chat thread member join/leave notification
   enableLeaveThreadOnWindowClosed?: boolean; // Whether to remove user on browser close event
   enableSenderDisplayNameInTypingNotification?: boolean; // Whether to send sender display name in typing notification

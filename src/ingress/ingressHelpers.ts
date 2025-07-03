@@ -18,6 +18,7 @@ import {
 import { ChatEqualityFields, GetStateFunction } from '../types/AdapterTypes';
 import { ChatMessage, ParticipantsAddedEvent, ParticipantsRemovedEvent } from '@azure/communication-chat';
 import {
+  logFileManagerFileDownloadFailed,
   logProcessingParticipantAddedEvent,
   logProcessingParticipantRemovedEvent,
   logUnsupportedMessageType
@@ -88,11 +89,7 @@ export const downloadAttachments = async (
 
     return await filemanager.downloadFiles(files);
   } catch (exception) {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.FILEMANAGER_DOWNLOAD_FILE_FAILED,
-      Description: `Downloading attachment for message failed.`,
-      ExceptionDetails: exception
-    });
+    logFileManagerFileDownloadFailed(exception);
     eventManager.handleError(exception);
   }
 };
@@ -126,11 +123,7 @@ export const downloadAttachmentsDirect = async (
     }
     return await filemanager.downloadFiles(fileData);
   } catch (exception) {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.FILEMANAGER_DOWNLOAD_FILE_FAILED,
-      Description: `Downloading attachment for message failed.`,
-      ExceptionDetails: exception
-    });
+    logFileManagerFileDownloadFailed(exception);
     eventManager.handleError(exception);
   }
 };
