@@ -1,0 +1,71 @@
+
+trigger: 
+  - main
+  
+pr:
+  - '*'
+
+resources:
+  repositories:
+    - repository: 1ESPipelineTemplates
+      type: git
+      name: 1ESPipelineTemplates/1ESPipelineTemplates
+      ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
+    featureFlags:
+      enableSRMonitoring: true
+    pool:
+      name: ess-1eshp-windows-latest
+    stages:
+      - stage: buildStage
+        displayName: Build
+        jobs:
+          - job: buildJob
+            displayName: Build
+            templateContext:
+              outputs:
+              - output: pipelineArtifact
+                path: $(System.DefaultWorkingDirectory)/
+            steps:
+              - task: Npm@1
+                displayName: 'Set postinstall scripts to true'
+                inputs:
+                  command: 'custom'
+                  customCommand: 'config set ignore-scripts false'
+              - task: NodeTool@0
+                displayName: 'Install Node LTS'
+                inputs:
+                  versionSpec: '22.x'
+              - task: Npm@1
+                displayName: "Clean Install Dependencies"
+                inputs:
+                  command: "ci"
+              - task: Npm@1
+                displayName: "Build App"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build"
+              - task: Npm@1
+                displayName: "Package for NPM"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:package"
+              - task: Npm@1
+                displayName: "Build App ESM"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:es5"
+              - task: Npm@1
+                displayName: "Build Debug"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:debug"
+              - task: ManifestGeneratorTask@0
+                displayName: 'Generation Task'
+                inputs:
+                    BuildDropPath: $(System.DefaultWorkingDirectory)
+              
