@@ -51,9 +51,9 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: Npm@1
-                displayName: "Clean Install Dependencies"
+                displayName: "Install Dependencies"
                 inputs:
-                  command: "ci"
+                  command: "install"
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
