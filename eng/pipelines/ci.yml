@@ -1,0 +1,124 @@
+
+# Trigger on all pushes to main
+trigger: 
+  - main
+
+# Run on all PRs
+pr:
+  - '*'
+
+# Run a nightly (PST), to create the alpha release
+schedules:
+  - cron: '0 8 * * *'
+    displayName: Nightly Alpha Release Build
+    branches:
+      include:
+      - main
+
+resources:
+  repositories:
+    - repository: 1ESPipelineTemplates
+      type: git
+      name: 1ESPipelineTemplates/1ESPipelineTemplates
+      ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
+    featureFlags:
+      enableSRMonitoring: true
+    pool:
+      name: ess-1eshp-windows-latest
+    stages:
+      - stage: buildStage
+        displayName: Build
+        jobs:
+          - job: buildJob
+            displayName: Build
+            templateContext:
+              outputs:
+              - output: pipelineArtifact
+                path: $(System.DefaultWorkingDirectory)/
+            steps:
+              - task: Npm@1
+                displayName: 'Set postinstall scripts to true'
+                inputs:
+                  command: 'custom'
+                  customCommand: 'config set ignore-scripts false'
+              - task: NodeTool@0
+                displayName: 'Install Node LTS'
+                inputs:
+                  versionSpec: '22.x'
+              - task: Npm@1
+                displayName: "Clean Install Dependencies"
+                inputs:
+                  command: "ci"
+              - task: Npm@1
+                displayName: "Build App"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build"
+              - task: Npm@1
+                displayName: "Package for NPM"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:package"
+              - task: Npm@1
+                displayName: "Build App ESM"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:es5"
+              - task: Npm@1
+                displayName: "Build Debug"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:debug"
+              - task: ManifestGeneratorTask@0
+                displayName: 'Generation Task'
+                inputs:
+                    BuildDropPath: $(System.DefaultWorkingDirectory)
+          
+          - job: publishAlpha
+            displayName: ESRP NPM Publish
+            dependsOn: buildStage
+            condition: succeeded(buildStage) && eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
+            templateContext:
+              type: releaseJob
+              isProduction: true
+              inputs:
+                - input: pipelineArtifact
+                  pipeline: _internal_acs_webchat-chat-adapter-CI
+                  artifactName: drop
+                  targetPath: $(System.DefaultWorkingDirectory)/drop
+              steps:
+                # - task: 
+                #   displayName: Check for code changes
+                #  TODO: COMPLETE THIS
+
+                - task: EsrpRelease@9
+                  displayName: ESRP Release
+                  enabled: false
+                  timeoutInMinutes: 0
+                  inputs:
+                    connectedservicename: ACS WebchatAdapter ESRP Release Connection
+                    usemanagedidentity: true
+                    keyvaultname: AcsWebChatAdapterRelease
+                    signcertname: AcsWCA-ReleaseCert-9b8f
+                    clientid: 9ed91db5-8ad8-419b-9b8f-00b5edaffd07
+                    intent: PackageDistribution
+                    contenttype: npm
+                    contentsource: Folder
+                    folderlocation: $(System.DefaultWorkingDirectory)/drop/package
+                    waitforreleasecompletion: true
+                    owners: wamo@microsoft.com
+                    approvers: eboltonmaggs@microsoft.com
+                    serviceendpointurl: https://api.esrp.microsoft.com
+                    mainpublisher: ESRPRELPACMAN
+                    downloadentity: DownloadCenter
+                    domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
+                    contentorigin: azeus
+                    productstate: dev
+                    audience: Workflow.A_S_AV_PackageManager
+              
+                
