@@ -81,8 +81,8 @@ extends:
           
           - job: publishAlpha
             displayName: ESRP NPM Publish
-            dependsOn: buildStage
-            condition: succeeded(buildStage) && eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
+            dependsOn: buildJob
+            condition: succeeded(buildJob) && eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
             templateContext:
               type: releaseJob
               isProduction: true
