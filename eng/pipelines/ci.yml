@@ -74,6 +74,20 @@ extends:
                 inputs:
                   command: "custom"
                   customCommand: "run build:debug"
+              - task: Npm@1
+                displayName: 'Run jest unit tests'
+                inputs:
+                  command: 'custom'
+                  customCommand: 'run test:unit'
+              - task: Npm@1
+                enabled: true
+                displayName: 'Run jest integration tests'
+                env:
+                  ResourceConnectionString: $(RESOURCECONNECTIONSTRING)
+                inputs:
+                  command: 'custom'
+                  customCommand: 'run execute:integrationtest'
+
               - task: ManifestGeneratorTask@0
                 displayName: 'Generation Task'
                 inputs:
