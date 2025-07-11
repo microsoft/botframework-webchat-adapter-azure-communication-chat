@@ -3,7 +3,6 @@ import EventTarget, { Event, defineEventAttribute } from 'event-target-shim';
 export class CustomEvent extends Event<string> {
   public detail: any;
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   constructor(eventName: string, detail: any) {
     super(eventName);
     this.detail = detail;
@@ -12,7 +11,6 @@ export class CustomEvent extends Event<string> {
 
 export default class EventManager extends EventTarget {
   //this function is not ready to use yet
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   public raiseCustomEvent(eventName: string, payload?: any): void {
     // tslint:disable-line:no-any
     const eventDetails = payload ? { payload: payload } : undefined;
@@ -20,7 +18,7 @@ export default class EventManager extends EventTarget {
     try {
       // For non IE11 scenarios, customevent object can be dispatched
       event = new CustomEvent(eventName, eventDetails);
-    } catch (e) {
+    } catch {
       // Special handling for IE11 scenario, where customevent object cannot be dispatched
       // event = document.createEvent('CustomEvent');
       // event.initCustomEvent(eventName, true, true, eventDetails); // tslint:disable-line:no-any

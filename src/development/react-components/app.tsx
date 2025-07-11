@@ -1,6 +1,6 @@
 import ReactDOM from 'react-dom';
 import React from 'react';
-import AdaptiveCard from './AdaptiveCard';
+import AdaptiveCard from './adaptiveCard';
 import LeaveChatButton from './leaveChatButton';
 import PaginationMessagesButton from './paginationMessagesButton';
 

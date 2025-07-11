@@ -35,34 +35,7 @@ const DISPLAY_NAMES = [
   'Queen Kaur'
 ];
 
-// this variable will be replaced by webpack.dev.config.js
-// set authURL to token management service URL if token management project at
-// https://skype.visualstudio.com/SCC/_git/internal_acs_token-management?path=%2F&version=GBinitial&_a=contents)
-// is running. You can host token management project on any server.
-// if you do not have token managemnt project running, paste ACS connection string in webpack.dev.config.js
-const authURL = 'TOKEN_MANAGEMENT_SERVICE_URL';
-
-export const authForNewUser = async (): Promise<UserTokenResponse> => {
-  const response = await fetch(authURL);
-  const { id, token, expiresOn, environmentUrl } = await response.json();
-
-  const returnJson: UserTokenResponse = {
-    id,
-    token,
-    expiresOn,
-    environmentUrl,
-    displayName: DISPLAY_NAMES[Math.floor(Math.random() * DISPLAY_NAMES.length)]
-  };
-
-  return returnJson;
-};
-
 const createUserToken = async (): Promise<UserTokenResponse> => {
-  // get token from token management service
-  if (authURL) {
-    return await authForNewUser();
-  }
-
   // this variable will be replaced by webpack.dev.config.js
   const resourceConnectionString = 'RESOURCE_CONNECTION_STRING_TO_BE_REPLACED';
   if (!resourceConnectionString) {

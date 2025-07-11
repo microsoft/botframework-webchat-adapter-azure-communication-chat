@@ -127,7 +127,7 @@ export class OneDriveFileManager implements IFileManager {
 
         // Example using the metadata
         // IUploadFile will contain any custom metadata you provided during upload
-        if (file.metadata) {
+        if (file.metadata?.name) {
           console.log(`File name: ${file.metadata?.name}`);
         }
 
@@ -153,7 +153,7 @@ export class OneDriveFileManager implements IFileManager {
       try {
         return JSON.parse(metadata?.onedriveReferences);
       } catch (e) {
-        throw new Error('Failed to parse onedriveReferences in ChatMessage metadata.');
+        throw new Error('Failed to parse onedriveReferences in ChatMessage metadata: ', e);
       }
     }
   }
@@ -179,7 +179,7 @@ export class OneDriveFileManager implements IFileManager {
       try {
         return JSON.parse(metadata?.onedriveMetadata);
       } catch (e) {
-        throw new Error('Failed to parse onedriveMetadata in ChatMessage metadata.');
+        throw new Error('Failed to parse onedriveMetadata in ChatMessage metadata.', e);
       }
     }
   }
