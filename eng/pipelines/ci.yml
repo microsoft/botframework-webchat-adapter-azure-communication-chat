@@ -5,7 +5,9 @@ trigger:
 
 # Run on all PRs
 pr:
-  - '*'
+  branches:
+    include:
+      - '*'
 
 # Run a nightly (PST), to create the alpha release
 schedules:
