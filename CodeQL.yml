@@ -1,0 +1,11 @@
+path_classifiers:
+  # https://eng.ms/docs/cloud-ai-platform/devdiv/one-engineering-system-1es/1es-docs/codeql/troubleshooting/bugs/generated-library-code
+  docs:
+    # Add docs here
+  library:
+    # Classify all files in the top-level directories srcPortal/packages/ as library code.
+    - node_modules
+  generated:
+    # Classify code in Output folder as generated code
+    - types/src
+    - dist

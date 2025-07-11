@@ -17,7 +17,7 @@ export default function rejectOnAbort(signal: AbortSignal): Promise<void> {
     deferred.reject(abortError);
   };
 
-  signal && signal.addEventListener('abort', handler);
+  if (signal) {signal.addEventListener('abort', handler);}
 
   return deferred.promise;
 }

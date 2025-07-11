@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <title>Chat Adapter Prototype</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      For simplicity and code clarity, we are using Babel and React from unpkg.com.
+    -->
+    <script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone@7.8.7/babel.min.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react@16.8.6/umd/react.development.js"></script>
+    <script crossorigin="anonymous" src="https://unpkg.com/react-dom@16.8.6/umd/react-dom.development.js"></script>
+    <!--
+      This CDN points to the latest official release of Web Chat. If you need to test against Web Chat's latest bits, please refer to pointing to Web Chat's MyGet feed:
+      https://github.com/microsoft/BotFramework-WebChat#how-to-test-with-web-chats-latest-bits
+    -->
+    <script crossorigin="anonymous" src="https://cdn.botframework.com/botframework-webchat/latest/webchat.js"></script>
+    <script src="http://localhost:8080/chat-adapter-dev.js"></script>
+
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      #webchat {
+        height: 100%;
+        width: 100%;
+      }
+
+      .activityStatus {
+        color: #767676;
+        font-family: Calibri, 'Helvetica Neue', Arial, sans-serif;
+      }
+
+      .activityStatus__sendStatus,
+      .activityStatus__timestampPretext {
+        font-size: 80%;
+      }
+
+      .activityStatus__timestampContent {
+        text-transform: lowercase;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="webchat" role="main"></div>
+    <script type="text/babel" data-presets="es2015,react,stage-3">
+      (async function () {
+        const { ReactWebChat } = window.WebChat;
+        const {
+          createACSAdapter,
+          threadInitialize /* this function is a mock server logic and only exists in dev mode*/
+        } = window.ChatAdapter;
+
+        // All the logic in this function should be implemented in server sideP
+        // Check src\development\threadInitialize.ts for reference
+        const { token, userId, threadId, environmentUrl, displayName } = await threadInitialize();
+        const directLine = createACSAdapter(token, userId, threadId, environmentUrl, displayName);
+
+        const store = window.WebChat.createStore({}, () => (next) => (action) => next(action));
+
+        const avatarMiddleware = () => (next) => ({ fromUser, ...otherArgs }) => {
+          const {
+            activity: {
+              from: { role, name, id }
+            }
+          } = otherArgs;
+          let initias = '';
+          if (name) {
+            const nameSplitted = name.split(' ');
+            if (nameSplitted.length >= 2) {
+              initias = nameSplitted[0].charAt(0) + nameSplitted[1].charAt(0);
+            } else {
+              initias = nameSplitted[0].charAt(0);
+            }
+          }
+          if (initias) {
+            return () => (
+              <span
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  backgroundColor: 'orange',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 40 / 2
+                }}
+              >
+                <p>{`${initias}`}</p>
+              </span>
+            );
+          } else {
+            return () => <span></span>;
+          }
+        };
+
+        window.ReactDOM.render(
+          <ReactWebChat
+            avatarMiddleware={avatarMiddleware}
+            directLine={directLine}
+            store={store}
+            sendTypingIndicator={true}
+            styleOptions={{ hideUploadButton: true, botAvatarInitials: 'WC', userAvatarInitials: 'WW' }}
+          />,
+          document.getElementById('webchat')
+        );
+        document.querySelector('#webchat > *').focus();
+        window.directLine = directLine;
+        window.store = store;
+      })().catch((err) => console.error(err));
+    </script>
+  </body>
+</html>
