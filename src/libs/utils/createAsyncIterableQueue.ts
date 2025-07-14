@@ -76,7 +76,7 @@ export default function createAsyncIterableQueue<T>(options: AsyncIterableQueueO
 
     push(value: T) {
       queue.push(value);
-      nextIterateDeferred && nextIterateDeferred.resolve();
+      if (nextIterateDeferred) { nextIterateDeferred.resolve(); }
     },
 
     watermark() {

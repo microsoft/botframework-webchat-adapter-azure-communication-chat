@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en-US">
+
+<head>
+  <title>Chat Adapter Prototype</title>
+  <script src="http://localhost:8080/dist/chat-adapter.es5.js"></script>
+  <script src="https://cdn.botframework.com/botframework-webchat/latest/webchat-es5.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/text-encoding@0.6.4/lib/encoding.min.js"></script>
+  <style type="text/css">
+    body,
+    html,
+    #parent {
+      height: 100%;
+      width: 100%;
+      display: flex;
+    }
+
+    body {
+      background-color: #f7f7f7;
+      margin: 0;
+    }
+
+    #devPanel {
+      display: none;
+    }
+
+    #root {
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+      margin: auto;
+      min-width: 360px;
+      max-width: 720px;
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="parent">
+    <div id="root"></div>
+    <div id="devPanel"></div>
+  </div>
+  <script>
+    (function () {
+      if (!window.crypto && (window).msCrypto) {
+        (window).crypto = (window).msCrypto;
+      }
+      'use strict';
+      var createACSAdapter = window.ChatAdapter.createACSAdapter;
+      var threadInitialize = window.ChatAdapter.threadInitialize;
+      var renderDebugPanel = window.ChatAdapter.renderDebugPanel;
+
+      // All the logic in this function should be implemented in server side
+      // Check src\development\threadInitialize.ts for reference
+      threadInitialize().then(
+        function (config) {
+          var token = config.token;
+          var userId = config.userId;
+          var threadId = config.threadId;
+          var environmentUrl = config.environmentUrl;
+          var displayName = config.displayName;
+          var chatClient = config.chatClient;
+
+          var featuresOption = {
+            enableAdaptiveCards: true,  // Whether to enable adaptive card payload in adapter (which will convert content payload into a json string)
+            enableThreadMemberUpdateNotification: true,  // Whether to enable chat thread member join/leave notification
+            enableLeaveThreadOnWindowClosed: true,  // Whether to remove user on browser close event
+            enableMessageErrorHandler: true, // Whether to enable error handler to handle failed messages.
+            historyPageSizeLimit: undefined  // History messages's size limit per page. Off by default if no size limit provided
+          };
+
+          var directLine = createACSAdapter(token, userId, threadId, environmentUrl, displayName, chatClient, {
+            logEvent: function (eventLevel, event) {
+              console.log('eventLevel: ${eventLevel}, event object: ${JSON.stringify(event)}')
+            }
+          }, featuresOption);
+
+          // Sample code to display activity Error( Message send/receive )
+          var store = window.WebChat.createStore({});
+
+          window.WebChat.renderWebChat(
+            {
+              directLine: directLine,
+              store: store,
+              sendTypingIndicator: true,
+              styleOptions: {
+                hideUploadButton: true
+              }
+            },
+            document.getElementById('root')
+          );
+
+          window.directLine = directLine;
+          window.store = store;
+          renderDebugPanel(document.getElementById('devPanel'), store);
+        }
+      );
+
+
+    })();
+  </script>
+</body>
+
+</html>

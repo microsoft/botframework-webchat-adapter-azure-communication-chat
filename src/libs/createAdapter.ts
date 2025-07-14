@@ -40,13 +40,14 @@ export default function createAdapter<TActivity, TAdapterState extends AdapterSt
 
         ingressQueues.push(queue);
 
-        signal &&
+        if (signal) {
           signal.addEventListener('abort', () => {
             const index = ingressQueues.indexOf(queue);
-
-            ~index || ingressQueues.splice(index, 1);
+            if (index !== -1) {
+              ingressQueues.splice(index, 1);
+            }
           });
-
+        }
         return queue.iterable;
       },
 
@@ -54,7 +55,7 @@ export default function createAdapter<TActivity, TAdapterState extends AdapterSt
         ingressQueues.forEach((ingressQueue) => ingressQueue.end());
         ingressQueues.splice(0, Infinity);
 
-        activeSubscription && activeSubscription.unsubscribe();
+        if (activeSubscription) { activeSubscription.unsubscribe(); }
         activeSubscription = null;
       },
 
@@ -102,7 +103,7 @@ export default function createAdapter<TActivity, TAdapterState extends AdapterSt
         readyStatePropertyValue = readyState;
 
         if (readyState === ReadyState.CLOSED) {
-          activeSubscription && activeSubscription.unsubscribe();
+          if (activeSubscription) {activeSubscription.unsubscribe();}
           activeSubscription = null;
         }
 
@@ -110,7 +111,7 @@ export default function createAdapter<TActivity, TAdapterState extends AdapterSt
       },
 
       subscribe: (observable: Observable<TActivity> | false) => {
-        activeSubscription && activeSubscription.unsubscribe();
+        if (activeSubscription) { activeSubscription.unsubscribe();}
         activeSubscription = null;
 
         if (!observable) {

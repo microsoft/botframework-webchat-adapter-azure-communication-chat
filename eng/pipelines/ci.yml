@@ -5,7 +5,9 @@ trigger:
 
 # Run on all PRs
 pr:
-  - '*'
+  branches:
+    include:
+      - '*'
 
 # Run a nightly (PST), to create the alpha release
 schedules:
@@ -51,9 +53,9 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: Npm@1
-                displayName: "Clean Install Dependencies"
+                displayName: "Install Dependencies"
                 inputs:
-                  command: "ci"
+                  command: "install"
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
@@ -74,6 +76,20 @@ extends:
                 inputs:
                   command: "custom"
                   customCommand: "run build:debug"
+              - task: Npm@1
+                displayName: 'Run jest unit tests'
+                inputs:
+                  command: 'custom'
+                  customCommand: 'run test:unit'
+              - task: Npm@1
+                enabled: true
+                displayName: 'Run jest integration tests'
+                env:
+                  ResourceConnectionString: $(RESOURCECONNECTIONSTRING)
+                inputs:
+                  command: 'custom'
+                  customCommand: 'run execute:integrationtest'
+
               - task: ManifestGeneratorTask@0
                 displayName: 'Generation Task'
                 inputs:
@@ -81,8 +97,8 @@ extends:
           
           - job: publishAlpha
             displayName: ESRP NPM Publish
-            dependsOn: buildStage
-            condition: succeeded(buildStage) && eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
+            dependsOn: buildJob
+            condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
             templateContext:
               type: releaseJob
               isProduction: true

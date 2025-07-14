@@ -46,7 +46,7 @@ import {
   logStreamingMessageChunkEventAlreadyProcessed,
   logStreamingMessageChunkEventReceived,
   logParticipantAddedEventReceived,
-  logPollingSkippedThreadDeleted as logAdapterPollingSkipped,
+  logAdapterPollingSkipped,
   logSendPollingRequest,
   logSkipProcessedPolledMessage,
   logProcessingPolledMessage,
@@ -186,7 +186,9 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
       const sendErrorActivity = async (unsubscribed: boolean, next: any, error: Error): Promise<void> => {
         const activity = await convertErrorMessage(error);
-        !unsubscribed && next(activity);
+        if (!unsubscribed) { 
+          next(activity);
+        }
       };
 
       const sendHistoryMessages = async (
@@ -310,13 +312,14 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
         const eventManager: EventManager = getState(StateKey.EventManager);
         eventManager?.addEventListener('acs-adapter-leavechat', () => {
           const chatMemberId: string = getState(StateKey.UserId);
-          !unsubscribed &&
+          if (!unsubscribed) {
             chatThreadClient.removeParticipant(
               {
                 communicationUserId: chatMemberId
               },
               telemetryOptions
             );
+          }
         });
       };
 

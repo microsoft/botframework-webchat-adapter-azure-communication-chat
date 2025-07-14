@@ -124,10 +124,7 @@ export const logConvertHistoryTextMessage = (chatMessage: ChatMessage): void => 
   });
 };
 
-export const logPollingSkippedThreadDeleted = (
-  getState: GetStateFunction<ACSAdapterState>,
-  description: string
-): void => {
+export const logAdapterPollingSkipped = (getState: GetStateFunction<ACSAdapterState>, description: string): void => {
   Logger.logEvent(LogLevel.INFO, {
     Event: LogEvent.ACS_ADAPTER_POLLING_SKIPPED,
     Description: description,
@@ -579,7 +576,7 @@ export const logEditEventFailedMetadataParsing = (
   });
 };
 
-export const logFileManagerFileDownloadFailed = (exception: Error): void => {
+export const logFileManagerDownloadFileFailed = (exception: Error): void => {
   Logger.logEvent(LogLevel.ERROR, {
     Event: LogEvent.FILEMANAGER_DOWNLOAD_FILE_FAILED,
     Description: `Downloading attachment for message failed.`,
