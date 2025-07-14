@@ -99,11 +99,11 @@ extends:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
 
       - stage: releaseStage
+        dependsOn: buildStage
         displayName: Release
         jobs:
           - job: publishAlpha
             displayName: ESRP NPM Publish
-            dependsOn: buildStage
             ## TODO: set this so it is enabled only if there is a productstate variable set and use this
             condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
             templateContext:
