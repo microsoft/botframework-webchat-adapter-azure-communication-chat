@@ -3,11 +3,11 @@
 trigger: 
   - main
 
-# Run on all PRs
-pr:
-  branches:
-    include:
-      - '*'
+# Run on all PRs, by default this is the case
+# pr:
+#   branches:
+#     include:
+#       - '*'
 
 # Run a nightly (PST), to create the alpha release
 schedules:
@@ -37,7 +37,7 @@ extends:
         displayName: Build
         jobs:
           - job: buildJob
-            displayName: Build
+            displayName: JavaScript Bundle
             templateContext:
               outputs:
               - output: pipelineArtifact
@@ -56,6 +56,9 @@ extends:
                 displayName: "Install Dependencies"
                 inputs:
                   command: "install"
+              ## TODO: ADD TASK TO UPDATE PACKAGE.JSON with alpha tag if nightly created.
+              ## update "x.y.z-beta.n" to "x.y.(z+1)-alpha-DATESTAMP"
+              ## also set release type variable appropriately
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
@@ -94,10 +97,14 @@ extends:
                 displayName: 'Generation Task'
                 inputs:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
-          
+
+      - stage: releaseStage
+        displayName: Release
+        jobs:
           - job: publishAlpha
             displayName: ESRP NPM Publish
-            dependsOn: buildJob
+            dependsOn: buildStage
+            ## TODO: set this so it is enabled only if there is a productstate variable set and use this
             condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
             templateContext:
               type: releaseJob
@@ -109,12 +116,12 @@ extends:
                   targetPath: $(System.DefaultWorkingDirectory)/drop
               steps:
                 # - task: 
-                #   displayName: Check for code changes
+                #   displayName: Check for code changes in the last 24 hours (effectively since last alpha release)
                 #  TODO: COMPLETE THIS
 
                 - task: EsrpRelease@9
                   displayName: ESRP Release
-                  enabled: false
+                  enabled: false 
                   timeoutInMinutes: 0
                   inputs:
                     connectedservicename: ACS WebchatAdapter ESRP Release Connection
@@ -134,7 +141,7 @@ extends:
                     downloadentity: DownloadCenter
                     domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
                     contentorigin: azeus
-                    productstate: dev
+                    productstate: dev     # this can be dev (alpha), latest (STABLE) or next(beta) = NPM tag.
                     audience: Workflow.A_S_AV_PackageManager
               
                 
