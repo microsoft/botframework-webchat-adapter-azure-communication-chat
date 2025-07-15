@@ -129,8 +129,11 @@ extends:
                 displayName: 'Install Node LTS'
                 inputs:
                   versionSpec: '22.x'
-              - powerShell: |
-                  Write-Host "##vso[task.setvariable variable=dateStamp;]$(Get-Date -format yyyyMMdd)"
+              - task: PowerShell@2
+                displayName: "Set DateStamp Variable"
+                inputs:
+                  script: |
+                    Write-Host "##vso[task.setvariable variable=dateStamp;]$(Get-Date -format yyyyMMdd)"
               - task: PowerShell@2
                 displayName: 'Set alpha variables (dev tag)'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
@@ -170,7 +173,7 @@ extends:
               - publish: $(System.DefaultWorkingDirectory)/
                 artifact: buildArtifact
                 displayName: Publish Build
-                
+
           - job: publishToNpm
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
@@ -208,4 +211,3 @@ extends:
                     productstate: $(releaseType)
                     audience: Workflow.A_S_AV_PackageManager
               
-                
