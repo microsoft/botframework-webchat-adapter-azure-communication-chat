@@ -20,10 +20,10 @@ schedules:
 parameters:
   - name: npmReleaseType          # The NPM release tag
     displayName: NPM Release Tag
-    default: ''
+    default: ' '
     type: string
     values:
-    - ''              # No release!
+    - ' '              # No release!
     - 'dev'           # Alpha release
     - 'next'          # Beta release
     - 'latest'        # Stable
