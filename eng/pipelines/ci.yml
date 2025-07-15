@@ -17,14 +17,18 @@ schedules:
       include:
       - main
 
-variables:
-  - name: releaseType   # The NPM release tag
+parameters:
+  - name: npmReleaseType          # The NPM release tag
     displayName: NPM Release Tag
     default: ""
     values:
     - 'dev'           # Alpha release
     - 'next'          # Beta release
     - 'latest'        # Stable
+
+variables:
+  - name: releaseType
+    value: ${{ npmReleaseType }}
 
 resources:
   repositories:
