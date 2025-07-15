@@ -17,6 +17,10 @@ schedules:
       include:
       - main
 
+variables:
+  - name: releaseType   # The NPM release tag
+    value: ""           # Can be empty for no release, 'dev' (alpha), 'latest' (STABLE) or 'next' (beta)
+
 resources:
   repositories:
     - repository: 1ESPipelineTemplates
@@ -32,16 +36,14 @@ extends:
       enableSRMonitoring: true
     pool:
       name: ess-1eshp-windows-latest
+
+    # Separate out the CI builds from releasing
     stages:
       - stage: buildStage
         displayName: Build
         jobs:
           - job: buildJob
-            displayName: JavaScript Bundle
-            templateContext:
-              outputs:
-              - output: pipelineArtifact
-                path: $(System.DefaultWorkingDirectory)/
+            displayName: CI Build and Test
             steps:
               - task: Npm@1
                 displayName: 'Set postinstall scripts to true'
@@ -56,24 +58,21 @@ extends:
                 displayName: "Install Dependencies"
                 inputs:
                   command: "install"
-              ## TODO: ADD TASK TO UPDATE PACKAGE.JSON with alpha tag if nightly created.
-              ## update "x.y.z-beta.n" to "x.y.(z+1)-alpha-DATESTAMP"
-              ## also set release type variable appropriately
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
                   command: "custom"
                   customCommand: "run build"
               - task: Npm@1
+                displayName: "Build App (ESM)"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:es5"
+              - task: Npm@1
                 displayName: "Package for NPM"
                 inputs:
                   command: "custom"
                   customCommand: "run build:package"
-              - task: Npm@1
-                displayName: "Build App ESM"
-                inputs:
-                  command: "custom"
-                  customCommand: "run build:es5"
               - task: Npm@1
                 displayName: "Build Debug"
                 inputs:
@@ -100,28 +99,70 @@ extends:
 
       - stage: releaseStage
         dependsOn: buildStage
+        condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # OR started manually.
         displayName: Release
         jobs:
+          - job: releaseBuild
+            displayName: Build For Release
+            templateContext:
+              outputs:
+              - output: pipelineArtifact
+                path: $(System.DefaultWorkingDirectory)/
+            steps:
+              - task: Npm@1
+                displayName: 'Set postinstall scripts to true'
+                inputs:
+                  command: 'custom'
+                  customCommand: 'config set ignore-scripts false'
+              - task: NodeTool@0
+                displayName: 'Install Node LTS'
+                inputs:
+                  versionSpec: '22.x'
+              - task: Npm@1
+                displayName: "Install Dependencies"
+                inputs:
+                  command: "install"
+
+            # - task: 
+            #   displayName: Check for code changes in the last 24 hours (effectively since last alpha release)
+            #  if no changes, don't release
+
+              ## TODO: ADD TASK TO UPDATE PACKAGE.JSON with alpha tag if nightly created.
+              ## update "x.y.z-beta.n" to "x.y.(z+1)-alpha-DATESTAMP"
+              ## also set release type variable appropriately
+              - task: 
+
+              - task: Npm@1
+                displayName: "Build App"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build"
+              - task: Npm@1
+                displayName: "Build App (ESM)"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:es5"
+              - task: Npm@1
+                displayName: "Package for NPM"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:package"
+
           - job: publishAlpha
-            displayName: ESRP NPM Publish
-            ## TODO: set this so it is enabled only if there is a productstate variable set and use this
-            condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
+            displayName: Publish to NPM (ESRP)
+            dependsOn: releaseBuild
+            condition: in(variables.releaseType, 'dev', 'next', 'latest')  # Only run this job if the releaseType is set
             templateContext:
               type: releaseJob
               isProduction: true
               inputs:
                 - input: pipelineArtifact
-                  pipeline: _internal_acs_webchat-chat-adapter-CI
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
               steps:
-                # - task: 
-                #   displayName: Check for code changes in the last 24 hours (effectively since last alpha release)
-                #  TODO: COMPLETE THIS
-
                 - task: EsrpRelease@9
-                  displayName: ESRP Release
-                  enabled: false 
+                  displayName: ESRP NPM Deploy
+                  enabled: false                    ## TODO: ENABLE ONCE ALL IS GOOD
                   timeoutInMinutes: 0
                   inputs:
                     connectedservicename: ACS WebchatAdapter ESRP Release Connection
@@ -141,7 +182,7 @@ extends:
                     downloadentity: DownloadCenter
                     domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
                     contentorigin: azeus
-                    productstate: dev     # this can be dev (alpha), latest (STABLE) or next(beta) = NPM tag.
+                    productstate: $(releaseType)
                     audience: Workflow.A_S_AV_PackageManager
               
                 
