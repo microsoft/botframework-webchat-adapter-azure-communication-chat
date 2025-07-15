@@ -22,6 +22,7 @@ parameters:
     displayName: NPM Release Tag
     default: ""
     values:
+    - ''              # No release!
     - 'dev'           # Alpha release
     - 'next'          # Beta release
     - 'latest'        # Stable
