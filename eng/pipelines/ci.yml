@@ -170,9 +170,6 @@ extends:
                 displayName: 'Generation Task'
                 inputs:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
-              - publish: $(System.DefaultWorkingDirectory)/
-                artifact: buildArtifact
-                displayName: Publish Build
 
           - job: publishToNpm
             displayName: Publish to NPM (ESRP)
