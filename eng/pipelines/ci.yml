@@ -3,11 +3,11 @@
 trigger: 
   - main
 
-# Run on all PRs
-pr:
-  branches:
-    include:
-      - '*'
+# Run on all PRs, by default this is the case
+# pr:
+#   branches:
+#     include:
+#       - '*'
 
 # Run a nightly (PST), to create the alpha release
 schedules:
@@ -16,6 +16,21 @@ schedules:
     branches:
       include:
       - main
+
+parameters:
+  - name: npmReleaseType          # The NPM release tag
+    displayName: NPM Release Tag
+    default: ' '
+    type: string
+    values:
+    - ' '             # No release!
+    - 'dev'           # Alpha release
+    - 'next'          # Beta release
+    - 'latest'        # Stable
+
+variables:
+  - name: releaseType
+    value: ${{ parameters.npmReleaseType }}
 
 resources:
   repositories:
@@ -32,16 +47,14 @@ extends:
       enableSRMonitoring: true
     pool:
       name: ess-1eshp-windows-latest
+
+    # Separate out the CI builds from releasing
     stages:
       - stage: buildStage
         displayName: Build
         jobs:
           - job: buildJob
-            displayName: Build
-            templateContext:
-              outputs:
-              - output: pipelineArtifact
-                path: $(System.DefaultWorkingDirectory)/
+            displayName: CI Build and Test
             steps:
               - task: Npm@1
                 displayName: 'Set postinstall scripts to true'
@@ -62,15 +75,15 @@ extends:
                   command: "custom"
                   customCommand: "run build"
               - task: Npm@1
+                displayName: "Build App (ESM)"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:es5"
+              - task: Npm@1
                 displayName: "Package for NPM"
                 inputs:
                   command: "custom"
                   customCommand: "run build:package"
-              - task: Npm@1
-                displayName: "Build App ESM"
-                inputs:
-                  command: "custom"
-                  customCommand: "run build:es5"
               - task: Npm@1
                 displayName: "Build Debug"
                 inputs:
@@ -94,27 +107,87 @@ extends:
                 displayName: 'Generation Task'
                 inputs:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
-          
-          - job: publishAlpha
-            displayName: ESRP NPM Publish
-            dependsOn: buildJob
-            condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build')     
+
+      - stage: releaseStage
+        dependsOn: buildStage
+        condition: or(eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), in(variables.releaseType, 'dev', 'next', 'latest'))
+        displayName: Release
+        jobs:
+          - job: releaseBuild
+            displayName: Build For Release
+            templateContext:
+              outputs:
+              - output: pipelineArtifact
+                path: $(System.DefaultWorkingDirectory)/
+            steps:
+              - task: Npm@1
+                displayName: 'Set postinstall scripts to true'
+                inputs:
+                  command: 'custom'
+                  customCommand: 'config set ignore-scripts false'
+              - task: NodeTool@0
+                displayName: 'Install Node LTS'
+                inputs:
+                  versionSpec: '22.x'
+              - task: PowerShell@2
+                displayName: 'Set alpha variables (dev tag)'
+                condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
+                inputs:  
+                  targetType: 'inline'
+                  script: |
+                    Write-Host "##vso[task.setvariable variable=releaseType;]dev"
+              - task: Npm@1
+                displayName: Update Package Version for nightly release
+                condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
+                inputs:
+                  command: 'custom'
+                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(Date:yyyyMMdd))'
+              - task: Npm@1
+                displayName: "Install Dependencies"
+                inputs:
+                  command: "ci"
+              - task: Npm@1
+                displayName: "Build App"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build"
+              - task: Npm@1
+                displayName: "Build App (ESM)"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:es5"
+              - task: Npm@1
+                displayName: "Package for NPM"
+                inputs:
+                  command: "custom"
+                  customCommand: "run build:package"
+              - task: ManifestGeneratorTask@0
+                displayName: 'Generation Task'
+                inputs:
+                    BuildDropPath: $(System.DefaultWorkingDirectory)
+
+          - job: publishToNpm
+            displayName: Publish to NPM (ESRP)
+            dependsOn: releaseBuild
+            condition: in(variables.releaseType, 'dev', 'next', 'latest')  # Only run this job if the releaseType is set
             templateContext:
               type: releaseJob
               isProduction: true
               inputs:
                 - input: pipelineArtifact
-                  pipeline: _internal_acs_webchat-chat-adapter-CI
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
               steps:
-                # - task: 
-                #   displayName: Check for code changes
-                #  TODO: COMPLETE THIS
+                - task: PowerShell@2
+                  displayName: Log values
+                  inputs:  
+                  targetType: 'inline'
+                  script: |
+                    echo "Build is $(releaseType)"
 
                 - task: EsrpRelease@9
-                  displayName: ESRP Release
-                  enabled: false
+                  displayName: ESRP NPM Deploy
+                  enabled: false                    ## TODO: ENABLE ONCE ALL IS GOOD
                   timeoutInMinutes: 0
                   inputs:
                     connectedservicename: ACS WebchatAdapter ESRP Release Connection
@@ -134,7 +207,6 @@ extends:
                     downloadentity: DownloadCenter
                     domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
                     contentorigin: azeus
-                    productstate: dev
+                    productstate: $(releaseType)
                     audience: Workflow.A_S_AV_PackageManager
               
-                
