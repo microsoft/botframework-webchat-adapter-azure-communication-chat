@@ -19,7 +19,12 @@ schedules:
 
 variables:
   - name: releaseType   # The NPM release tag
-    value: ""           # Can be empty for no release, 'dev' (alpha), 'latest' (STABLE) or 'next' (beta)
+    displayName: NPM Release Tag
+    default: ""
+    values:
+    - 'dev'           # Alpha release
+    - 'next'          # Beta release
+    - 'latest'        # Stable
 
 resources:
   repositories:
@@ -99,7 +104,7 @@ extends:
 
       - stage: releaseStage
         dependsOn: buildStage
-        condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # OR started manually.
+        condition: or(eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), in(variables.releaseType, 'dev', 'next', 'latest'))
         displayName: Release
         jobs:
           - job: releaseBuild
@@ -136,10 +141,6 @@ extends:
                 displayName: "Install Dependencies"
                 inputs:
                   command: "install"
-            # - task: TODO
-            #   displayName: Check for code changes in the last 24 hours (effectively since last alpha release)
-            #  if no changes, don't release
-
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
@@ -155,6 +156,10 @@ extends:
                 inputs:
                   command: "custom"
                   customCommand: "run build:package"
+              - task: ManifestGeneratorTask@0
+                displayName: 'Generation Task'
+                inputs:
+                    BuildDropPath: $(System.DefaultWorkingDirectory)
 
           - job: publishAlpha
             displayName: Publish to NPM (ESRP)
