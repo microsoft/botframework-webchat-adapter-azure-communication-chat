@@ -23,7 +23,7 @@ parameters:
     default: ' '
     type: string
     values:
-    - ' '              # No release!
+    - ' '             # No release!
     - 'dev'           # Alpha release
     - 'next'          # Beta release
     - 'latest'        # Stable
@@ -129,24 +129,25 @@ extends:
                 displayName: 'Install Node LTS'
                 inputs:
                   versionSpec: '22.x'
+              - powerShell: |
+                  Write-Host "##vso[task.setvariable variable=dateStamp;]$(Get-Date -format yyyyMMdd)"
               - task: PowerShell@2
-                displayName: 'Set alpha variables'
+                displayName: 'Set alpha variables (dev tag)'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
                 inputs:  
                   targetType: 'inline'
                   script: |
-                    Write-Host "##vso[task.setvariable variable=dateStamp;]$(Get-Date -format yyyyMMdd)"
                     Write-Host "##vso[task.setvariable variable=releaseType;]dev"
               - task: Npm@1
-                displayName: Update Package Version for Nightly release
-                condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
+                displayName: Update Package Version for nightly release
+                condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
                 inputs:
                   command: 'custom'
                   customCommand: 'version prerelease --git-tag-version false --preid alpha-$(dateStamp)'
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
-                  command: "install"
+                  command: "ci"
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
@@ -166,8 +167,11 @@ extends:
                 displayName: 'Generation Task'
                 inputs:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
-
-          - job: publishAlpha
+              - publish: $(System.DefaultWorkingDirectory)/
+                artifact: buildArtifact
+                displayName: Publish Build
+                
+          - job: publishToNpm
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
             condition: in(variables.releaseType, 'dev', 'next', 'latest')  # Only run this job if the releaseType is set
