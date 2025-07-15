@@ -30,7 +30,7 @@ parameters:
 
 variables:
   - name: releaseType
-    value: ${{ npmReleaseType }}
+    value: ${{ parameters.npmReleaseType }}
 
 resources:
   repositories:
