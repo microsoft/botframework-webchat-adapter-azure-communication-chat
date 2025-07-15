@@ -121,10 +121,11 @@ extends:
               - task: PowerShell@2
                 displayName: 'Set alpha variables'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
-                targetType: 'inline'
-                script: |
-                  Write-Host "##vso[task.setvariable variable=dateStamp;]$(Get-Date -format yyyyMMdd)"
-                  Write-Host "##vso[task.setvariable variable=releaseType;]dev"
+                inputs:  
+                  targetType: 'inline'
+                  script: |
+                    Write-Host "##vso[task.setvariable variable=dateStamp;]$(Get-Date -format yyyyMMdd)"
+                    Write-Host "##vso[task.setvariable variable=releaseType;]dev"
               - task: Npm@1
                 displayName: Update Package Version for Nightly release
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
