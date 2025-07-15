@@ -130,11 +130,6 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: PowerShell@2
-                displayName: "Set DateStamp Variable"
-                inputs:
-                  script: |
-                    Write-Host "##vso[task.setvariable variable=dateStamp;]$(Get-Date -format yyyyMMdd)"
-              - task: PowerShell@2
                 displayName: 'Set alpha variables (dev tag)'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
                 inputs:  
@@ -146,7 +141,7 @@ extends:
                 condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
                 inputs:
                   command: 'custom'
-                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(dateStamp)'
+                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(Date:yyyyMMdd))'
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
@@ -183,6 +178,13 @@ extends:
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
               steps:
+                - task: PowerShell@2
+                  displayName: Log values
+                  inputs:  
+                  targetType: 'inline'
+                  script: |
+                    echo "Build is $(releaseType)"
+
                 - task: EsrpRelease@9
                   displayName: ESRP NPM Deploy
                   enabled: false                    ## TODO: ENABLE ONCE ALL IS GOOD
