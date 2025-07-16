@@ -133,12 +133,18 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: PowerShell@2
-                displayName: 'Set alpha variables (dev tag)'
+                displayName: 'Set dev tag for nightly alpha'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
                 inputs:  
                   targetType: 'inline'
                   script: |
                     Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
+              - task: PowerShell@2
+                displayName: 'Set dateStamp (dev tag)'
+                condition: eq(variables.releaseType, 'dev'). # Only set for dev build (alpha)
+                inputs:  
+                  targetType: 'inline'
+                  script: |
                     $date=$(Get-Date -format yyyyMMdd-Hmmss)
                     Write-Host "##vso[task.setvariable variable=dateStamp;isOutput=true]$date"
               - task: Npm@1
