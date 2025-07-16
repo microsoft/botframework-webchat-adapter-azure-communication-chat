@@ -141,7 +141,7 @@ extends:
                     Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
               - task: PowerShell@2
                 displayName: 'Set dateStamp (dev tag)'
-                condition: eq(variables.releaseType, 'dev'). # Only set for dev build (alpha)
+                condition: eq(variables.releaseType, 'dev') # Only set for dev build (alpha)
                 inputs:  
                   targetType: 'inline'
                   script: |
