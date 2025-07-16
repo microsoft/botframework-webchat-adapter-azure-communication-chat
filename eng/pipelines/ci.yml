@@ -133,20 +133,24 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: PowerShell@2
-                displayName: 'Set alpha variables (dev tag)'
+                displayName: 'Enable alpha release if changed'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
                 inputs:  
                   targetType: 'inline'
                   script: |
-                    Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
-                    $date=$(Get-Date -format yyyyMMdd-Hmmss)
-                    Write-Host "##vso[task.setvariable variable=dateStamp;isOutput=true]$date"
-              - task: Npm@1
-                displayName: Update Package Version for nightly release
-                condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
+                    if ((git whatchanged --since="1 day ago" -p).Length -gt 0) {
+                      Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
+                    } else { 
+                      echo "No Changes" 
+                    }
+              - task: PowerShell@2
+                displayName: Update Package Version for alpha release
+                condition: eq(variables.releaseType, 'dev') # Only set the package.json version on alpha-tagged releases
                 inputs:
-                  command: 'custom'
-                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(dateStamp))'
+                  targetType: 'inline'
+                  script: |
+                    $DATE_STAMP=$(Get-Date -format yyyyMMdd)
+                    npm version prerelease --git-tag-version false --preid alpha-$DATE_STAMP
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
@@ -174,7 +178,7 @@ extends:
           - job: publishToNpm
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
-            condition: in(variables.releaseType, 'dev', 'next', 'latest')  # Only run this job if the releaseType is set
+            condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest'))  # Only run this job if the releaseType is set properly
             templateContext:
               type: releaseJob
               isProduction: true
