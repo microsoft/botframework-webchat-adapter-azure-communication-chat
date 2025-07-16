@@ -138,7 +138,7 @@ extends:
                 inputs:  
                   targetType: 'inline'
                   script: |
-                    if ((git whatchanged --since="1 day ago" -p).Length > 0) {
+                    if ((git whatchanged --since="1 day ago" -p).Length -gt 0) {
                       Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
                     } else { 
                       echo "No Changes" 
