@@ -147,14 +147,15 @@ extends:
               #     script: |
               #       $date=$(Get-Date -format yyyyMMdd-Hmmss)
               #       Write-Host "##vso[task.setvariable variable=dateStamp;isOutput=true]$(date)"
-              - task: Npm@1
+              - task: PowerShell@2
                 displayName: Update Package Version for nightly release
                 condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
-                env:
-                  DATE_STAMP: $(Date:yyyyMMdd)
                 inputs:
-                  command: 'custom'
-                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(DATE_STAMP)'
+                  # command: 'custom'
+                  # customCommand: 'version prerelease --git-tag-version false --preid alpha-$(DATE_STAMP)'
+                  script: |
+                    $(DATE_STAMP)=$(Get-Date -format yyyyMMdd-Hmmss)
+                    npm version prerelease --git-tag-version false --preid alpha-$(DATE_STAMP)
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
