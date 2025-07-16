@@ -155,7 +155,7 @@ extends:
                   # command: 'custom'
                   # customCommand: 'version prerelease --git-tag-version false --preid alpha-$(DATE_STAMP)'
                   script: |
-                    $(DATE_STAMP)=$(Get-Date -format yyyyMMdd-Hmmss)
+                    $DATE_STAMP=$(Get-Date -format yyyyMMdd-Hmmss)
                     npm version prerelease --git-tag-version false --preid alpha-$(DATE_STAMP)
               - task: Npm@1
                 displayName: "Install Dependencies"
