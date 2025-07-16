@@ -47,6 +47,9 @@ extends:
       enableSRMonitoring: true
     pool:
       name: ess-1eshp-windows-latest
+    sdl:
+      codeSignValidation:
+        enabled: false
 
     # Separate out the CI builds from releasing
     stages:
