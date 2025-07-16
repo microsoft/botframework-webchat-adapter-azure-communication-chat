@@ -151,6 +151,7 @@ extends:
                 displayName: Update Package Version for nightly release
                 condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
                 inputs:
+                  targetType: 'inline'
                   # command: 'custom'
                   # customCommand: 'version prerelease --git-tag-version false --preid alpha-$(DATE_STAMP)'
                   script: |
