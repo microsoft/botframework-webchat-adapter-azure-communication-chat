@@ -135,13 +135,15 @@ extends:
                 inputs:  
                   targetType: 'inline'
                   script: |
-                    Write-Host "##vso[task.setvariable variable=releaseType;]dev"
+                    Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
+                    $date=$(Get-Date -format yyyyMMdd-Hmmss)
+                    Write-Host "##vso[task.setvariable variable=dateStamp;isOutput=true]$date"
               - task: Npm@1
                 displayName: Update Package Version for nightly release
                 condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
                 inputs:
                   command: 'custom'
-                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(Date:yyyyMMdd))'
+                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(dateStamp))'
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
