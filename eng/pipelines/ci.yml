@@ -112,6 +112,10 @@ extends:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
 
       - stage: releaseStage
+        parameters:
+          sdl:
+            codeSignValidation:
+              enabled: false
         dependsOn: buildStage
         condition: or(eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), in(variables.releaseType, 'dev', 'next', 'latest'))
         displayName: Release
