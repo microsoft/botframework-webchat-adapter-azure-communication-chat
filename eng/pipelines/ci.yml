@@ -112,10 +112,6 @@ extends:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
 
       - stage: releaseStage
-        parameters:
-          sdl:
-            codeSignValidation:
-              enabled: false
         dependsOn: buildStage
         condition: or(eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), in(variables.releaseType, 'dev', 'next', 'latest'))
         displayName: Release
@@ -186,6 +182,10 @@ extends:
                 - input: pipelineArtifact
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
+              parameters:
+                sdl:
+                  codeSignValidation:
+                    enabled: false
               steps:
                 - task: PowerShell@2
                   displayName: Log values
