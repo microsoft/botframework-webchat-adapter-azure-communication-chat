@@ -139,20 +139,22 @@ extends:
                   targetType: 'inline'
                   script: |
                     Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
-              - task: PowerShell@2
-                displayName: 'Set dateStamp (dev tag)'
-                condition: eq(variables.releaseType, 'dev') # Only set for dev build (alpha)
-                inputs:  
-                  targetType: 'inline'
-                  script: |
-                    $date=$(Get-Date -format yyyyMMdd-Hmmss)
-                    Write-Host "##vso[task.setvariable variable=dateStamp;isOutput=true]$date"
+              # - task: PowerShell@2
+              #   displayName: 'Set dateStamp (dev tag)'
+              #   condition: eq(variables.releaseType, 'dev') # Only set for dev build (alpha)
+              #   inputs:  
+              #     targetType: 'inline'
+              #     script: |
+              #       $date=$(Get-Date -format yyyyMMdd-Hmmss)
+              #       Write-Host "##vso[task.setvariable variable=dateStamp;isOutput=true]$(date)"
               - task: Npm@1
                 displayName: Update Package Version for nightly release
                 condition: eq(variables.releaseType, 'dev') # Only set the alpha build tag on dev-tagged builds
+                env:
+                  DATE_STAMP: $(Date:yyyyMMdd)
                 inputs:
                   command: 'custom'
-                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(dateStamp))'
+                  customCommand: 'version prerelease --git-tag-version false --preid alpha-$(DATE_STAMP)'
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
