@@ -30,7 +30,10 @@ parameters:
 
 variables:
   - name: releaseType
-    value: ${{ parameters.npmReleaseType }}
+    ${{ if eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') }}:
+      value: 'dev'    # Override to dev tag for nightly scheduled release
+    ${{ else }}:
+      value: {{ parameters.npmReleaseType }}
 
 resources:
   repositories:
@@ -47,9 +50,6 @@ extends:
       enableSRMonitoring: true
     pool:
       name: ess-1eshp-windows-latest
-    sdl:
-      codeSignValidation:
-        enabled: false
 
     # Separate out the CI builds from releasing
     stages:
@@ -113,7 +113,7 @@ extends:
 
       - stage: releaseStage
         dependsOn: buildStage
-        condition: or(eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), in(variables.releaseType, 'dev', 'next', 'latest'))
+        condition: in(variables.releaseType, 'dev', 'next', 'latest')
         displayName: Release
         jobs:
           - job: releaseBuild
@@ -133,15 +133,17 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: PowerShell@2
-                displayName: 'Enable alpha release if changed'
+                displayName: 'Check for changes on nightly schedule'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
                 inputs:  
                   targetType: 'inline'
                   script: |
                     if ((git whatchanged --since="1 day ago" -p).Length -gt 0) {
-                      Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
+                      echo "Setting Alpha Build"
+                      Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]true"
                     } else { 
-                      echo "No Changes" 
+                      Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]false"
+                      echo "No Changes, not releasing alpha build"
                     }
               - task: PowerShell@2
                 displayName: Update Package Version for alpha release
@@ -178,7 +180,7 @@ extends:
           - job: publishToNpm
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
-            condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest'))  # Only run this job if the releaseType is set properly
+            condition: or(and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true)))  # Only run this job if the releaseType is set properly
             templateContext:
               sdl:
                 codeSignValidation:
