@@ -110,7 +110,7 @@ extends:
 
       - stage: releaseStage
         dependsOn: buildStage
-        condition: in(variables.releaseType, 'dev', 'next', 'latest')
+        condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest') )
         displayName: Release
         jobs:
           - job: releaseBuild
