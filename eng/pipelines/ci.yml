@@ -189,29 +189,29 @@ extends:
                 - input: pipelineArtifact
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
-              steps:
-                - task: EsrpRelease@9
-                  displayName: ESRP NPM Deploy
-                  enabled: true
-                  timeoutInMinutes: 0
-                  inputs:
-                    connectedservicename: ACS WebchatAdapter ESRP Release Connection
-                    usemanagedidentity: true
-                    keyvaultname: AcsWebChatAdapterRelease
-                    signcertname: AcsWCA-ReleaseCert-9b8f
-                    clientid: 9ed91db5-8ad8-419b-9b8f-00b5edaffd07
-                    intent: PackageDistribution
-                    contenttype: npm
-                    contentsource: Folder
-                    folderlocation: $(System.DefaultWorkingDirectory)/drop/package
-                    waitforreleasecompletion: true
-                    owners: wamo@microsoft.com
-                    approvers: eboltonmaggs@microsoft.com
-                    serviceendpointurl: https://api.esrp.microsoft.com
-                    mainpublisher: ESRPRELPACMAN
-                    downloadentity: DownloadCenter
-                    domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
-                    contentorigin: azeus
-                    productstate: $(releaseType)
-                    audience: Workflow.A_S_AV_PackageManager
-              
+            steps:
+              - task: EsrpRelease@9
+                displayName: ESRP NPM Deploy
+                enabled: true
+                timeoutInMinutes: 0
+                inputs:
+                  connectedservicename: ACS WebchatAdapter ESRP Release Connection
+                  usemanagedidentity: true
+                  keyvaultname: AcsWebChatAdapterRelease
+                  signcertname: AcsWCA-ReleaseCert-9b8f
+                  clientid: 9ed91db5-8ad8-419b-9b8f-00b5edaffd07
+                  intent: PackageDistribution
+                  contenttype: npm
+                  contentsource: Folder
+                  folderlocation: $(System.DefaultWorkingDirectory)/drop/package
+                  waitforreleasecompletion: true
+                  owners: wamo@microsoft.com
+                  approvers: eboltonmaggs@microsoft.com
+                  serviceendpointurl: https://api.esrp.microsoft.com
+                  mainpublisher: ESRPRELPACMAN
+                  downloadentity: DownloadCenter
+                  domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
+                  contentorigin: azeus
+                  productstate: $(releaseType)
+                  audience: Workflow.A_S_AV_PackageManager
+            
