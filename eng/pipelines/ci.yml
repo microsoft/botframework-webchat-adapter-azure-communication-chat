@@ -180,9 +180,12 @@ extends:
           - job: publishToNpm
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
-            condition: |  # Only run this job if the releaseType is set properly
-              or( and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest')), 
-                  and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true)) ) 
+            condition: | 
+              and(succeeded(), 
+                or( in(variables.releaseType, 'next', 'latest'), 
+                    and( eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true) )
+                  )
+                ) 
             templateContext:
               sdl:
                 codeSignValidation:
