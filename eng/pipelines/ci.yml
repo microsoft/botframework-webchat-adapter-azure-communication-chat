@@ -30,7 +30,7 @@ parameters:
 
 variables:
   - name: releaseType
-    value: ${{ iif (eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), 'dev', parameters.npmReleaseType }}
+    value: ${{ iif (eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), 'dev', parameters.npmReleaseType) }}
 
 resources:
   repositories:
@@ -177,7 +177,7 @@ extends:
           - job: publishToNpm
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
-           # condition: and( succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true))) )
+            condition: and( succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true))) )
             templateContext:
               sdl:
                 codeSignValidation:
