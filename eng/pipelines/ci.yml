@@ -174,9 +174,10 @@ extends:
                 inputs:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
 
-          - job: publishToNpm
+          - job: Release
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
+            # Run if for a beta release, or for alpha if there are changes
             condition: and( succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true))) )
             templateContext:
               sdl:
@@ -189,16 +190,9 @@ extends:
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
               steps:
-                - task: PowerShell@2
-                  displayName: Log values
-                  inputs:  
-                  targetType: 'inline'
-                  script: |
-                    echo "Build is $(releaseType)"
-
                 - task: EsrpRelease@9
                   displayName: ESRP NPM Deploy
-                  enabled: false                    ## TODO: ENABLE ONCE ALL IS GOOD
+                  enabled: true
                   timeoutInMinutes: 0
                   inputs:
                     connectedservicename: ACS WebchatAdapter ESRP Release Connection
