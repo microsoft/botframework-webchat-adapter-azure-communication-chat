@@ -26,11 +26,11 @@ parameters:
     - ' '             # No release!
     - 'dev'           # Alpha release
     - 'next'          # Beta release
-    - 'latest'        # Stable
+    #- 'latest'        # Stable, disabled for now; not released as stable
 
 variables:
   - name: releaseType
-    value: ${{ parameters.npmReleaseType }}
+    value: ${{ iif (eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), 'dev', parameters.npmReleaseType) }}
 
 resources:
   repositories:
@@ -47,9 +47,6 @@ extends:
       enableSRMonitoring: true
     pool:
       name: ess-1eshp-windows-latest
-    sdl:
-      codeSignValidation:
-        enabled: false
 
     # Separate out the CI builds from releasing
     stages:
@@ -113,7 +110,7 @@ extends:
 
       - stage: releaseStage
         dependsOn: buildStage
-        condition: or(eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), in(variables.releaseType, 'dev', 'next', 'latest'))
+        condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest') )
         displayName: Release
         jobs:
           - job: releaseBuild
@@ -133,15 +130,17 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: PowerShell@2
-                displayName: 'Enable alpha release if changed'
+                displayName: 'Check for changes on nightly schedule'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
                 inputs:  
                   targetType: 'inline'
                   script: |
                     if ((git whatchanged --since="1 day ago" -p).Length -gt 0) {
-                      Write-Host "##vso[task.setvariable variable=releaseType;isOutput=true]dev"
+                      echo "Setting Alpha Build"
+                      Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]true"
                     } else { 
-                      echo "No Changes" 
+                      Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]false"
+                      echo "No Changes, not releasing alpha build"
                     }
               - task: PowerShell@2
                 displayName: Update Package Version for alpha release
@@ -175,47 +174,44 @@ extends:
                 inputs:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
 
-          - job: publishToNpm
+          - job: Release
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
-            condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest'))  # Only run this job if the releaseType is set properly
+            # Run if for a beta release, or for alpha if there are changes
+            condition: and( succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true))) )
             templateContext:
+              sdl:
+                codeSignValidation:
+                  skipScanningJsInReleaseJob: true
               type: releaseJob
               isProduction: true
               inputs:
                 - input: pipelineArtifact
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
-              steps:
-                - task: PowerShell@2
-                  displayName: Log values
-                  inputs:  
-                  targetType: 'inline'
-                  script: |
-                    echo "Build is $(releaseType)"
-
-                - task: EsrpRelease@9
-                  displayName: ESRP NPM Deploy
-                  enabled: false                    ## TODO: ENABLE ONCE ALL IS GOOD
-                  timeoutInMinutes: 0
-                  inputs:
-                    connectedservicename: ACS WebchatAdapter ESRP Release Connection
-                    usemanagedidentity: true
-                    keyvaultname: AcsWebChatAdapterRelease
-                    signcertname: AcsWCA-ReleaseCert-9b8f
-                    clientid: 9ed91db5-8ad8-419b-9b8f-00b5edaffd07
-                    intent: PackageDistribution
-                    contenttype: npm
-                    contentsource: Folder
-                    folderlocation: $(System.DefaultWorkingDirectory)/drop/package
-                    waitforreleasecompletion: true
-                    owners: wamo@microsoft.com
-                    approvers: eboltonmaggs@microsoft.com
-                    serviceendpointurl: https://api.esrp.microsoft.com
-                    mainpublisher: ESRPRELPACMAN
-                    downloadentity: DownloadCenter
-                    domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
-                    contentorigin: azeus
-                    productstate: $(releaseType)
-                    audience: Workflow.A_S_AV_PackageManager
-              
+            steps:
+              - task: EsrpRelease@9
+                displayName: ESRP NPM Deploy
+                enabled: true
+                timeoutInMinutes: 0
+                inputs:
+                  connectedservicename: ACS WebchatAdapter ESRP Release Connection
+                  usemanagedidentity: true
+                  keyvaultname: AcsWebChatAdapterRelease
+                  signcertname: AcsWCA-ReleaseCert-9b8f
+                  clientid: 9ed91db5-8ad8-419b-9b8f-00b5edaffd07
+                  intent: PackageDistribution
+                  contenttype: npm
+                  contentsource: Folder
+                  folderlocation: $(System.DefaultWorkingDirectory)/drop/package
+                  waitforreleasecompletion: true
+                  owners: wamo@microsoft.com
+                  approvers: eboltonmaggs@microsoft.com
+                  serviceendpointurl: https://api.esrp.microsoft.com
+                  mainpublisher: ESRPRELPACMAN
+                  downloadentity: DownloadCenter
+                  domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
+                  contentorigin: azeus
+                  productstate: $(releaseType)
+                  audience: Workflow.A_S_AV_PackageManager
+            
