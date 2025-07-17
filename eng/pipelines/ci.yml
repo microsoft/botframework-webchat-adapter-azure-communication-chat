@@ -26,7 +26,7 @@ parameters:
     - ' '             # No release!
     - 'dev'           # Alpha release
     - 'next'          # Beta release
-    - 'latest'        # Stable
+    #- 'latest'        # Stable, disabled for now; not released as stable
 
 variables:
   - name: releaseType
