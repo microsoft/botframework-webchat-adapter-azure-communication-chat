@@ -30,10 +30,7 @@ parameters:
 
 variables:
   - name: releaseType
-    ${{ if eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') }}:
-      value: 'dev'    # Override to dev tag for nightly scheduled release
-    ${{ else }}:
-      value: {{ parameters.npmReleaseType }}
+    value: ${{ iif (eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), 'dev', parameters.npmReleaseType }}
 
 resources:
   repositories:
