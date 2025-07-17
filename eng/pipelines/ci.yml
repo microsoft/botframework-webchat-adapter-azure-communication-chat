@@ -180,6 +180,9 @@ extends:
             dependsOn: releaseBuild
             condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest'))  # Only run this job if the releaseType is set properly
             templateContext:
+              sdl:
+                codeSignValidation:
+                  skipScanningJsInReleaseJob: true
               type: releaseJob
               isProduction: true
               inputs:
