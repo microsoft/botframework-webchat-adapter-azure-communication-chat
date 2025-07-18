@@ -130,13 +130,14 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: PowerShell@2
+                name: ChangesCheck
                 displayName: 'Check for changes on nightly schedule'
                 condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
                 inputs:  
                   targetType: 'inline'
                   script: |
                     if ((git whatchanged --since="1 day ago" -p).Length -gt 0) {
-                      echo "Setting Alpha Build"
+                      echo "Changes detected; scheduling alpha release"
                       Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]true"
                     } else { 
                       Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]false"
@@ -177,6 +178,8 @@ extends:
           - job: Release
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
+            variables:
+              hasChanges: $ [ dependencies.releaseBuild.outputs['hasChanges'] ]
             # Run if for a beta release, or for alpha if there are changes
             condition: and( succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true))) )
             templateContext:
