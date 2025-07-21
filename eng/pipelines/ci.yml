@@ -178,10 +178,8 @@ extends:
           - job: Release
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
-            variables:
-              hasChanges: $ [ dependencies.releaseBuild.outputs['hasChanges'] ]
             # Run if for a beta release, or for alpha if there are changes
-            condition: and( succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(variables.hasChanges, true))) )
+            condition: and(succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(dependencies.releaseBuild.outputs['hasChanges'], 'true'))) )
             templateContext:
               sdl:
                 codeSignValidation:
