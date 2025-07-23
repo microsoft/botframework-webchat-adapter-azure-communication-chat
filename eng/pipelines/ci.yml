@@ -179,8 +179,8 @@ extends:
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
             # Run if for a beta release, or for alpha if there are changes
-            # Details here: https://learn.microsoft.com/en-us/azure/devops/release-notes/2020/sprint-168-update#jobs-can-access-output-variables-from-previous-stages
-            condition: and(succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(stageDependencies.releaseStage.releaseBuild.outputs['ChangesCheck.hasChanges'], 'true'))) )
+            condition: and(succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(dependencies.releaseBuild.outputs['ChangesCheck.hasChanges'], 'true'))) )
+            # From https://learn.microsoft.com/en-us/azure/devops/pipelines/process/conditions?view=azure-devops&source=recommendations#job-output-variables-used-in-subsequent-job-conditions
             templateContext:
               sdl:
                 codeSignValidation:
