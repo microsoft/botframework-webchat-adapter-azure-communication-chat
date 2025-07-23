@@ -13,6 +13,7 @@ trigger:
 schedules:
   - cron: '0 8 * * *'
     displayName: Nightly Alpha Release Build
+    always: false # this is the default; we want to schedule only if changes since last success
     branches:
       include:
       - main
@@ -130,20 +131,6 @@ extends:
                 inputs:
                   versionSpec: '22.x'
               - task: PowerShell@2
-                name: ChangesCheck
-                displayName: 'Check for changes on nightly schedule'
-                condition: eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build') # Only from the nightly trigger
-                inputs:  
-                  targetType: 'inline'
-                  script: |
-                    if ((git whatchanged --since="1 day ago" -p).Length -gt 0) {
-                      echo "Changes detected; scheduling alpha release"
-                      Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]true"
-                    } else { 
-                      Write-Host "##vso[task.setvariable variable=hasChanges;isOutput=true]false"
-                      echo "No Changes, not releasing alpha build"
-                    }
-              - task: PowerShell@2
                 displayName: Update Package Version for alpha release
                 condition: eq(variables.releaseType, 'dev') # Only set the package.json version on alpha-tagged releases
                 inputs:
@@ -178,9 +165,8 @@ extends:
           - job: Release
             displayName: Publish to NPM (ESRP)
             dependsOn: releaseBuild
-            # Run if for a beta release, or for alpha if there are changes
-            # Details here: https://learn.microsoft.com/en-us/azure/devops/release-notes/2020/sprint-168-update#jobs-can-access-output-variables-from-previous-stages
-            condition: and(succeeded(), or(in(variables.releaseType, 'next', 'latest'), and(eq(variables.releaseType, 'dev'), eq(stageDependencies.releaseStage.releaseBuild.outputs['ChangesCheck.hasChanges'], 'true'))) )
+            # Run if for a beta release, or for alpha if there are changes - the cron schedule looks after the change checking
+            condition: and(succeeded(), or(in(variables.releaseType, 'next', 'latest'), eq(variables.releaseType, 'dev')) )
             templateContext:
               sdl:
                 codeSignValidation:
