@@ -11,7 +11,7 @@ trigger:
 
 # Run a nightly (PST), to create the alpha release
 schedules:
-  - cron: '0 8 * * *'
+  - cron: '*/20 * * * *' # '0 8 * * *'
     displayName: Nightly Alpha Release Build
     branches:
       include:
@@ -192,6 +192,12 @@ extends:
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
             steps:
+              - task: PowerShell
+                inputs:  
+                  targetType: 'inline'
+                  script: |
+                    echo "Testing with schedule change"
+
               - task: EsrpRelease@9
                 displayName: ESRP NPM Deploy
                 enabled: true
