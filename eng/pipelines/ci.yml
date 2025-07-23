@@ -192,7 +192,7 @@ extends:
                   artifactName: drop
                   targetPath: $(System.DefaultWorkingDirectory)/drop
             steps:
-              - task: PowerShell
+              - task: PowerShell@2
                 inputs:  
                   targetType: 'inline'
                   script: |
