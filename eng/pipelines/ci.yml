@@ -15,7 +15,7 @@ schedules:
     displayName: Nightly Alpha Release Build
     branches:
       include:
-      - main
+      - emlyn/*
 
 parameters:
   - name: npmReleaseType          # The NPM release tag
