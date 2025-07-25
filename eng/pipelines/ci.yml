@@ -46,9 +46,9 @@ extends:
     serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
     featureFlags:
       enableSRMonitoring: true
-    sdl:
-      git:
-        persistCredentials: true
+    # sdl:
+    #   git:
+    #     persistCredentials: true
     pool:
       name: ess-1eshp-windows-latest
 
@@ -123,6 +123,9 @@ extends:
               outputs:
               - output: pipelineArtifact
                 path: $(System.DefaultWorkingDirectory)/
+              sdl:
+                git:
+                  persistCredentials: true
             steps:
               - task: Npm@1
                 displayName: 'Set postinstall scripts to true'
