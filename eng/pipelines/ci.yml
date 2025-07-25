@@ -46,6 +46,8 @@ extends:
     serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
     featureFlags:
       enableSRMonitoring: true
+    git:
+      persistCredentials: true
     pool:
       name: ess-1eshp-windows-latest
 
@@ -130,14 +132,19 @@ extends:
                 displayName: 'Install Node LTS'
                 inputs:
                   versionSpec: '22.x'
+
               - task: PowerShell@2
-                displayName: Update Package Version for alpha release
-                condition: eq(variables.releaseType, 'dev') # Only set the package.json version on alpha-tagged releases
+                displayName: Set alpha release tag and push to GitHub
+                condition: eq(variables.releaseType, 'dev') # Only on alpha-tagged releases
+                continueOnError: true
                 inputs:
                   targetType: 'inline'
                   script: |
                     $DATE_STAMP=$(Get-Date -format yyyyMMdd)
-                    npm version prerelease --git-tag-version false --preid alpha-$DATE_STAMP
+                    $VersionString=$(npm version prerelease --git-tag-version false --preid alpha-$DATE_STAMP)
+                    git tag $VersionString
+                    git push origin
+
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
