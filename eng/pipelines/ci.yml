@@ -147,7 +147,7 @@ extends:
                     $DATE_STAMP=$(Get-Date -format yyyyMMdd)
                     $VersionString=$(npm version prerelease --git-tag-version false --preid alpha-$DATE_STAMP)
                     git tag $VersionString
-                    git push origin
+                    git push origin tag $VersionString
 
               - task: Npm@1
                 displayName: "Install Dependencies"
