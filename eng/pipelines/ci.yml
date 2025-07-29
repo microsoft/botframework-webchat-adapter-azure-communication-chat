@@ -148,7 +148,16 @@ extends:
                     $VersionString=$(npm version prerelease --git-tag-version false --preid alpha-$DATE_STAMP)
                     git tag $VersionString
                     git push origin tag $VersionString
-
+              - task: PowerShell@2
+                displayName: Tag non-alpha builds
+                condition: ne(variables.releaseType, 'dev') # Not alpha tagged
+                continueOnError: true
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $VersionString=$((Get-Content -Raw -Path .\package.json | ConvertFrom-Json).version)
+                    git tag $VersionString
+                    git push origin tag $VersionString
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
