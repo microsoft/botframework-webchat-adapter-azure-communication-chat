@@ -1,14 +1,8 @@
-import {
-  CommunicationIdentifier,
-  CommunicationIdentifierKind,
-  CommunicationUserIdentifier,
-  getIdentifierKind
-} from '@azure/communication-common';
-import { Logger, LogLevel } from '../log/Logger';
+import { CommunicationIdentifier, CommunicationIdentifierKind, getIdentifierKind } from '@azure/communication-common';
 import { FileMetadata, IFileManager, IUploadedFile } from '../types/FileManagerTypes';
 import { LogEvent } from '../types/LogTypes';
 import EventManager from '../utils/EventManager';
-import { ACSAdapterState, StateKey } from '../models/ACSAdapterState';
+import { ACSAdapterState } from '../models/ACSAdapterState';
 import {
   checkDuplicateMessage,
   checkDuplicateParticipantMessage,
@@ -17,12 +11,7 @@ import {
 } from '../utils/MessageComparison';
 import { ChatEqualityFields, GetStateFunction } from '../types/AdapterTypes';
 import { ChatMessage, ParticipantsAddedEvent, ParticipantsRemovedEvent } from '@azure/communication-chat';
-import {
-  logFileManagerDownloadFileFailed,
-  logProcessingParticipantAddedEvent,
-  logProcessingParticipantRemovedEvent,
-  logUnsupportedMessageType
-} from '../utils/LoggerUtils';
+import { LoggerUtils } from '../utils/LoggerUtils';
 
 /**
  * Returns the users id.
@@ -89,7 +78,7 @@ export const downloadAttachments = async (
 
     return await filemanager.downloadFiles(files);
   } catch (exception) {
-    logFileManagerDownloadFileFailed(exception);
+    LoggerUtils.logFileManagerDownloadFileFailed(exception);
     eventManager.handleError(exception);
   }
 };
@@ -123,7 +112,7 @@ export const downloadAttachmentsDirect = async (
     }
     return await filemanager.downloadFiles(fileData);
   } catch (exception) {
-    logFileManagerDownloadFileFailed(exception);
+    LoggerUtils.logFileManagerDownloadFileFailed(exception);
     eventManager.handleError(exception);
   }
 };
@@ -189,14 +178,7 @@ export const cacheTextMessageIfNeeded = (
     fileIds: fileManager?.getFileIds(event.metadata)
   });
   if (!isProcessed) {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: processingLogEvent,
-      Description: `ACS Adapter: Processing message`,
-      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-      TimeStamp: new Date().toISOString(),
-      ChatThreadId: getState(StateKey.ThreadId),
-      ChatMessageId: event.id
-    });
+    LoggerUtils.logProcessingTextMessage(getState, event, processingLogEvent);
     messageCache.set(event.id, {
       content: event.message,
       updatedOn: event.editedOn,
@@ -233,7 +215,7 @@ export const isDuplicateMessage = (
       });
     }
     default:
-      logUnsupportedMessageType(message);
+      LoggerUtils.logUnsupportedMessageType(message);
       return false;
   }
 };
@@ -268,7 +250,7 @@ export const updateMessageCacheWithMessage = (
       break;
     }
     default: {
-      logUnsupportedMessageType(message);
+      LoggerUtils.logUnsupportedMessageType(message);
       break;
     }
   }
@@ -284,7 +266,7 @@ export const cacheParticipantAddedEventIfNeeded = (
     addedParticipants: event.participantsAdded
   });
   if (!isProcessed) {
-    logProcessingParticipantAddedEvent(getState, event);
+    LoggerUtils.logProcessingParticipantAddedEvent(getState, event);
     messageCache.set(key, {
       addedParticipants: event.participantsAdded
     });
@@ -302,7 +284,7 @@ export const cacheParticipantRemovedEventIfNeeded = (
     removedParticipants: event.participantsRemoved
   });
   if (!isProcessed) {
-    logProcessingParticipantRemovedEvent(getState, event);
+    LoggerUtils.logProcessingParticipantRemovedEvent(getState, event);
     messageCache.set(key, {
       removedParticipants: event.participantsRemoved
     });

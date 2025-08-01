@@ -1,7 +1,6 @@
 import { ACSAdapterState, StateKey } from '../../models/ACSAdapterState';
 import { ChatClient, ChatMessage } from '@azure/communication-chat';
-import { LogLevel, Logger } from '../../log/Logger';
-
+import { LoggerUtils } from '../../utils/LoggerUtils';
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
 import { AdapterOptions } from '../../types/AdapterTypes';
 import { AsyncMapper } from '../../types/AsyncMapper';
@@ -9,7 +8,6 @@ import { CommunicationUserIdentifier } from '@azure/communication-common';
 import EventManager from '../../utils/EventManager';
 import { GetStateFunction } from '../../types/AdapterTypes';
 import { IFileManager } from '../../types/FileManagerTypes';
-import { LogEvent } from '../../types/LogTypes';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
 import { ChatEventMessage, convertMessageToActivity } from '../../utils/ConvertMessageUtils';
@@ -56,14 +54,7 @@ export default function createHistoryMessageToDirectLineActivityMapper({
 
     if (!chatClient) {
       const errorMessage = 'ACS Adapter: Failed to ingress history message without an active chatClient.';
-      Logger.logEvent(LogLevel.ERROR, {
-        Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
-        Description: errorMessage,
-        ACSRequesterUserId: getState(StateKey.UserId),
-        MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: message.createdOn.toISOString(),
-        ChatMessageId: message.id
-      });
+      LoggerUtils.logHistoryMessageIngressFailed(getState, message, errorMessage);
       throw new Error(errorMessage);
     }
 
@@ -77,15 +68,7 @@ export default function createHistoryMessageToDirectLineActivityMapper({
         return null;
       }
     } catch (exception) {
-      Logger.logEvent(LogLevel.ERROR, {
-        Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-        Description: 'Failed to queue attachments download',
-        ACSRequesterUserId: getState(StateKey.UserId),
-        MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: message.createdOn.toISOString(),
-        ChatMessageId: message.id,
-        ExceptionDetails: exception
-      });
+      LoggerUtils.logQueueAttachmentDownloadFailed(getState, message, exception);
       ErrorEventSubscriber.notifyErrorEvent({
         ErrorType: AdapterErrorEventType.HISTORY_MESSAGE_METADATA_FILEID_FETCH_FAILED,
         ErrorMessage: exception.message,

@@ -1,14 +1,13 @@
 import { ACSAdapterState, StateKey } from '../models/ACSAdapterState';
-import { LogLevel, Logger } from '../log/Logger';
 import { ACSDirectLineActivity } from '../models/ACSDirectLineActivity';
 import { ActivityType } from '../types/DirectLineTypes';
 import { ChatThreadClient, SendTypingNotificationOptions } from '@azure/communication-chat';
 import { EgressMiddleware } from '../libs/applyEgressMiddleware';
-import { LogEvent } from '../types/LogTypes';
 import { AdapterOptions } from '..';
 import packageInfo from '../../package.json';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../types/ErrorEventTypes';
+import { LoggerUtils } from '../utils/LoggerUtils';
 
 const telemetryOptions = {
   requestOptions: {
@@ -34,13 +33,7 @@ export default function createEgressTypingActivityMiddleware(): EgressMiddleware
 
       if (!chatThreadClient) {
         const errorMessage = 'ACS Adapter: Failed to egress typing activity with an undefined chatThreadClient.';
-        Logger.logEvent(LogLevel.ERROR, {
-          Event: LogEvent.ACS_ADAPTER_EGRESS_TYPING_FAILED,
-          Description: errorMessage,
-          ACSRequesterUserId: getState(StateKey.UserId),
-          TimeStamp: activity.timestamp,
-          ChatThreadId: getState(StateKey.ThreadId)
-        });
+        LoggerUtils.logEgressTypingFailed(getState, activity.timestamp, errorMessage);
         throw new Error(errorMessage);
       }
 
@@ -51,34 +44,12 @@ export default function createEgressTypingActivityMiddleware(): EgressMiddleware
           }
         : { ...telemetryOptions };
       try {
-        Logger.logEvent(LogLevel.DEBUG, {
-          Event: LogEvent.ACS_ADAPTER_EGRESS_TYPING_SENDING_REQUEST,
-          Description: 'ACS Adapter: Request sending a typing indication',
-          ACSRequesterUserId: getState(StateKey.UserId),
-          TimeStamp: activity.timestamp,
-          ChatThreadId: getState(StateKey.ThreadId)
-        });
+        LoggerUtils.logEgressTypingSendingRequest(getState, activity.timestamp);
         await chatThreadClient.sendTypingNotification(options);
-        Logger.logEvent(LogLevel.DEBUG, {
-          Event: LogEvent.ACS_ADAPTER_INGRESS_TYPING_SUCCESS,
-          Description: 'ACS Adapter: Successfully sent a typing indication',
-          ACSRequesterUserId: getState(StateKey.UserId),
-          TimeStamp: activity.timestamp,
-          ChatThreadId: getState(StateKey.ThreadId)
-        });
+        LoggerUtils.logIngressTypingSuccess(getState, activity.timestamp);
       } catch (exception) {
         const httpRequest = exception?.request;
-        Logger.logEvent(LogLevel.ERROR, {
-          Event: LogEvent.ACS_ADAPTER_SEND_MESSAGE_FAILED,
-          Description: `Send message failed.`,
-          CustomProperties: options,
-          ACSRequesterUserId: getState(StateKey.UserId),
-          TimeStamp: new Date().toISOString(),
-          ChatThreadId: getState(StateKey.ThreadId),
-          ChatMessageId: activity.messageid,
-          ClientActivityId: activity?.channelData.clientActivityID as string,
-          ExceptionDetails: exception
-        });
+        LoggerUtils.logEgressTypingSendFailed(getState, activity, options, exception);
         ErrorEventSubscriber.notifyErrorEvent({
           StatusCode: exception.response?.status,
           ErrorType: AdapterErrorEventType.EGRESS_SEND_MESSAGE_FAILED,

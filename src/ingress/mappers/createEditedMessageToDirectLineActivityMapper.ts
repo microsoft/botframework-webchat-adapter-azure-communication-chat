@@ -13,7 +13,7 @@ import { Role } from '../../types/DirectLineTypes';
 import uniqueId from '../../utils/uniqueId';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
-import { logEditEventFailedMetadataParsing } from '../../utils/LoggerUtils';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 
 export default function createEditedMessageToDirectLineActivityMapper({
   getState
@@ -70,7 +70,7 @@ export default function createEditedMessageToDirectLineActivityMapper({
           attachmentSizes = getAttachmentSizes(files);
         }
       } catch (exception) {
-        logEditEventFailedMetadataParsing(event, exception, getState);
+        LoggerUtils.logEditEventFailedMetadataParsing(event, exception, getState);
         ErrorEventSubscriber.notifyErrorEvent({
           ErrorType: AdapterErrorEventType.EDITED_MESSAGE_ATTACHMENT_DOWNLOAD_FAILED,
           ErrorMessage: exception.message,

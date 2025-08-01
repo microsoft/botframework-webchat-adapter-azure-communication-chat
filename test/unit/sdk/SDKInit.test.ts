@@ -5,12 +5,11 @@ import { authConfig } from '../../../src/sdk/Auth';
 import { config } from '../../../src/sdk/Config';
 import { ErrorEventSubscriber } from '../../../src/event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../../src/types/ErrorEventTypes';
-import * as LoggerUtils from '../../../src/utils/LoggerUtils';
+import { LogEvent, Logger, LogLevel } from '../../../src';
 
 jest.mock('@azure/communication-chat');
 jest.mock('@azure/communication-common');
 jest.mock('../../../src/event/ErrorEventNotifier');
-jest.mock('../../../src/utils/LoggerUtils');
 
 describe('SDKInit', () => {
   const mockId = 'mock-id';
@@ -30,6 +29,7 @@ describe('SDKInit', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Logger, 'logEvent').mockImplementation(jest.fn());
 
     (ChatClient as jest.Mock).mockImplementation(() => mockChatClient);
     (AzureCommunicationTokenCredential as jest.Mock).mockImplementation(() => ({}));
@@ -43,7 +43,13 @@ describe('SDKInit', () => {
     expect(ChatClient).toHaveBeenCalledWith(mockEnvironmentUrl, expect.anything());
     expect(mockGetChatThreadClient).toHaveBeenCalledWith(mockThreadId);
     expect(mockStartRealtimeNotifications).toHaveBeenCalled();
-    expect(LoggerUtils.logSDKStartInit).toHaveBeenCalledWith(mockThreadId, mockId);
+    expect(Logger.logEvent).toHaveBeenCalledWith(
+      LogLevel.INFO,
+      expect.objectContaining({
+        Description: expect.any(String),
+        Event: LogEvent.ACS_SDK_START_INIT
+      })
+    );
 
     expect(authConfig.id).toBe(mockId);
     expect(authConfig.environmentUrl).toBe(mockEnvironmentUrl);
@@ -79,7 +85,13 @@ describe('SDKInit', () => {
         RequesterUserId: mockId
       }
     });
-    expect(LoggerUtils.logSDKStartInitError).toHaveBeenCalled();
+    expect(Logger.logEvent).toHaveBeenCalledWith(
+      LogLevel.ERROR,
+      expect.objectContaining({
+        Description: expect.any(String),
+        Event: LogEvent.ACS_SDK_START_INIT_ERROR
+      })
+    );
   });
 
   test('should handle missing threadId', async () => {
@@ -92,7 +104,13 @@ describe('SDKInit', () => {
         RequesterUserId: mockId
       }
     });
-    expect(LoggerUtils.logSDKStartInitError).toHaveBeenCalled();
+    expect(Logger.logEvent).toHaveBeenCalledWith(
+      LogLevel.ERROR,
+      expect.objectContaining({
+        Description: expect.any(String),
+        Event: LogEvent.ACS_SDK_START_INIT_ERROR
+      })
+    );
   });
 
   test('should log error when chatThreadClient is undefined', async () => {
@@ -100,7 +118,13 @@ describe('SDKInit', () => {
 
     await SDKInit(mockToken, mockId, mockThreadId, mockEnvironmentUrl);
 
-    expect(LoggerUtils.logSDKJoinThreadError).toHaveBeenCalled();
+    expect(Logger.logEvent).toHaveBeenCalledWith(
+      LogLevel.ERROR,
+      expect.objectContaining({
+        Description: expect.any(String),
+        Event: LogEvent.ACS_SDK_JOINTHREAD_ERROR
+      })
+    );
   });
 
   test('should handle exceptions', async () => {
@@ -130,6 +154,12 @@ describe('SDKInit', () => {
       },
       CorrelationVector: 'correlation-id'
     });
-    expect(LoggerUtils.logSDKStartInitError).toHaveBeenCalled();
+    expect(Logger.logEvent).toHaveBeenCalledWith(
+      LogLevel.ERROR,
+      expect.objectContaining({
+        Description: expect.any(String),
+        Event: LogEvent.ACS_SDK_START_INIT_ERROR
+      })
+    );
   });
 });

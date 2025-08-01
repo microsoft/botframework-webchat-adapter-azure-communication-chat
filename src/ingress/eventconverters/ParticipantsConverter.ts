@@ -5,7 +5,8 @@ import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
 import { getIdFromIdentifier } from '../ingressHelpers';
 import { IUserUpdate } from '../../types/DirectLineTypes';
 import createThreadUpdateToDirectLineActivityMapper from '../mappers/createThreadUpdateToDirectLineActivityMapper';
-import { logConvertThreadUpdateEvent } from '../../utils/LoggerUtils';
+import { LoggerUtils } from '../../utils/LoggerUtils';
+import { LogEvent } from '../../types/LogTypes';
 
 export const processParticipants = async (
   participants: ChatParticipant[],
@@ -32,7 +33,7 @@ export const convertThreadUpdate = async (
   };
   const activity = await createThreadUpdateToDirectLineActivityMapper({ getState })()(user);
 
-  logConvertThreadUpdateEvent();
+  LoggerUtils.logSimpleInfoEvent(LogEvent.ACS_ADAPTER_CONVERT_THREAD_UPDATED, 'ACS Adapter: convert thread update');
 
   return activity;
 };

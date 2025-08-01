@@ -1,16 +1,13 @@
 import { ACSAdapterState, StateKey } from '../../models/ACSAdapterState';
 import { ActivityType, IDirectLineActivity } from '../../types/DirectLineTypes';
-import { LogLevel, Logger } from '../../log/Logger';
-
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
 import { AsyncMapper } from '../../types/AsyncMapper';
 import { ChatThreadClient, TypingIndicatorReceivedEvent } from '@azure/communication-chat';
-import { CommunicationUserIdentifier } from '@azure/communication-common';
 import { Constants } from '../../Constants';
 import { GetStateFunction } from '../../types/AdapterTypes';
-import { LogEvent } from '../../types/LogTypes';
 import { Role } from '../../types/DirectLineTypes';
 import { getIdFromIdentifier } from '../ingressHelpers';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 
 export default function createTypingMessageToDirectLineActivityMapper({
   getState
@@ -22,14 +19,7 @@ export default function createTypingMessageToDirectLineActivityMapper({
 
     if (!chatClient) {
       const errorMessage = 'ACS Adapter: Failed to ingress typing message without an active chatClient.';
-      Logger.logEvent(LogLevel.ERROR, {
-        Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
-        Description: errorMessage,
-        ACSRequesterUserId: getState(StateKey.UserId),
-        MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: message.receivedOn.toISOString(),
-        ChatThreadId: message.threadId
-      });
+      LoggerUtils.logTypingMessageIngressFailed(getState, message, errorMessage);
       throw new Error(errorMessage);
     }
 

@@ -2,12 +2,7 @@ import { ChatMessageDeletedEvent, ChatMessageEditedEvent } from '@azure/communic
 import createEditedMessageToDirectLineActivityMapper from '../mappers/createEditedMessageToDirectLineActivityMapper';
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
 import { GetStateFunction } from '../../types';
-import {
-  logConvertDeletedMessageEvent,
-  logConvertEditedMessageEvent,
-  logDeletedMessageEventIngressFailed,
-  logEditEventIngressFailed
-} from '../../utils/LoggerUtils';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 import { ACSAdapterState } from '../..';
 import createDeletedMessageEventToDirectLineActivityMapper from '../mappers/createDeletedMessageEventToDirectLineActivityMapper';
 
@@ -17,10 +12,10 @@ export const convertEditedMessageEvent = async (
 ): Promise<void | ACSDirectLineActivity> => {
   try {
     const activity = await createEditedMessageToDirectLineActivityMapper({ getState })()(event);
-    logConvertEditedMessageEvent(event);
+    LoggerUtils.logConvertEditedMessageEvent(event);
     return activity;
   } catch (error) {
-    logEditEventIngressFailed(event, error.message, getState);
+    LoggerUtils.logEditEventIngressFailed(event, error.message, getState);
   }
 };
 
@@ -30,9 +25,9 @@ export const convertDeletedMessageEvent = async (
 ): Promise<void | ACSDirectLineActivity> => {
   try {
     const activity = await createDeletedMessageEventToDirectLineActivityMapper({ getState })()(event);
-    logConvertDeletedMessageEvent(event);
+    LoggerUtils.logConvertDeletedMessageEvent(event);
     return activity;
   } catch (error) {
-    logDeletedMessageEventIngressFailed(event, error.message, getState);
+    LoggerUtils.logDeletedMessageEventIngressFailed(event, error.message, getState);
   }
 };

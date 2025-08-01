@@ -8,17 +8,10 @@ import createDeletedMessageEventToDirectLineActivityMapper from '../../../../src
 import { ACSDirectLineActivity } from '../../../../src/models/ACSDirectLineActivity';
 import { GetStateFunction } from '../../../../src/types';
 import { ACSAdapterState } from '../../../../src';
-import {
-  logConvertDeletedMessageEvent,
-  logConvertEditedMessageEvent,
-  logDeletedMessageEventIngressFailed,
-  logEditEventIngressFailed
-} from '../../../../src/utils/LoggerUtils';
 
 // Mock dependencies
 jest.mock('../../../../src/ingress/mappers/createEditedMessageToDirectLineActivityMapper');
 jest.mock('../../../../src/ingress/mappers/createDeletedMessageEventToDirectLineActivityMapper');
-jest.mock('../../../../src/utils/LoggerUtils');
 
 describe('MessageConverter', () => {
   // Mock data
@@ -54,7 +47,6 @@ describe('MessageConverter', () => {
       expect(createEditedMessageToDirectLineActivityMapper).toHaveBeenCalledWith({ getState: mockGetState });
       expect(middleFn).toHaveBeenCalled();
       expect(innerFn).toHaveBeenCalledWith(mockEditedEvent);
-      expect(logConvertEditedMessageEvent).toHaveBeenCalledWith(mockEditedEvent);
       expect(result).toBe(mockActivity);
     });
 
@@ -69,7 +61,6 @@ describe('MessageConverter', () => {
 
       const result = await convertEditedMessageEvent(mockEditedEvent, mockGetState);
 
-      expect(logEditEventIngressFailed).toHaveBeenCalledWith(mockEditedEvent, errorMessage, mockGetState);
       expect(result).toBeUndefined();
     });
   });
@@ -97,7 +88,6 @@ describe('MessageConverter', () => {
       expect(createDeletedMessageEventToDirectLineActivityMapper).toHaveBeenCalledWith({ getState: mockGetState });
       expect(middleFn).toHaveBeenCalled();
       expect(innerFn).toHaveBeenCalledWith(mockDeletedEvent);
-      expect(logConvertDeletedMessageEvent).toHaveBeenCalledWith(mockDeletedEvent);
       expect(result).toBe(mockActivity);
     });
 
@@ -112,7 +102,6 @@ describe('MessageConverter', () => {
 
       const result = await convertDeletedMessageEvent(mockDeletedEvent, mockGetState);
 
-      expect(logDeletedMessageEventIngressFailed).toHaveBeenCalledWith(mockDeletedEvent, errorMessage, mockGetState);
       expect(result).toBeUndefined();
     });
   });

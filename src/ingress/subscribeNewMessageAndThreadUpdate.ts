@@ -42,37 +42,7 @@ import { AdapterErrorEventType } from '../types/ErrorEventTypes';
 import { queueAttachmentDownloading } from '../utils/AttachmentProcessor';
 import { ConnectionStatus } from '../libs/enhancers/exportDLJSInterface';
 import { IMessagePollingHandle } from '../types/MessagePollingTypes';
-import {
-  logStreamingMessageChunkEventAlreadyProcessed,
-  logStreamingMessageChunkEventReceived,
-  logParticipantAddedEventReceived,
-  logAdapterPollingSkipped,
-  logSendPollingRequest,
-  logSkipProcessedPolledMessage,
-  logProcessingPolledMessage,
-  logCachePolledHistoryMessage,
-  logWebChatConnectedEvent,
-  logProcessCachedPagedHistoryMessage,
-  logPollingMessageFetchFailed,
-  logCancellingPollingCallback,
-  logPollingCallbackCreated,
-  logPollingCallStopped,
-  logPollingStatusCode,
-  logCancelPolling,
-  logParticipantAddedEventAlreadyProcessed,
-  logCacheParticipantsAddedEvent,
-  logProcessPolledCachedHistoryMessage,
-  logProcessCachedTextMessage,
-  logProcessCachedParticipantsAddedEvent,
-  logCacheParticipantRemovedEvent,
-  logParticipantRemovedEventReceived,
-  logParticipantRemovedEventAlreadyProcessed,
-  logProcessCachedParticipantsRemovedEvent,
-  logSkipProcessedEditEvent,
-  logMessageEditEventReceived,
-  logMessageDeletedEventReceived,
-  logSkipProcessedDeletedMessageEvent
-} from '../utils/LoggerUtils';
+import { LoggerUtils } from '../utils/LoggerUtils';
 import { convertStreamingMessageChunkEvent } from './eventconverters/StreamingMessageChunkReceivedEventConverter';
 import {
   convertAndProcessHistoryMessageByType,
@@ -108,15 +78,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
       const convertMessage = async (event: ChatMessageReceivedEvent): Promise<void | ACSDirectLineActivity> => {
         const activity = await createUserMessageToDirectLineActivityMapper({ getState })()(event);
 
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_MESSAGE,
-          Description: `ACS Adapter: convert normal message`,
-          CustomProperties: event,
-          MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: event.createdOn.toISOString(),
-          ChatThreadId: event.threadId,
-          ChatMessageId: event.id
-        });
+        LoggerUtils.logConvertMessage(event);
 
         return activity;
       };
@@ -130,27 +92,13 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
           files
         });
 
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-          Description: 'ACS Adapter: convert attachment history message:',
-          CustomProperties: message,
-          MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: message.createdOn.toISOString(),
-          ChatMessageId: message.id
-        });
-
+        LoggerUtils.logConvertHistoryMessage(message, 'ACS Adapter: convert attachment history message');
         return activity;
       };
 
       const convertErrorMessage = async (error: Error): Promise<void | ACSDirectLineActivity> => {
         const activity = await createErrorMessageToDirectLineActivityMapper({ getState })()(error);
-
-        Logger.logEvent(LogLevel.ERROR, {
-          Event: LogEvent.ACS_SDK_CHATCLIENT_ERROR,
-          Description: 'ACS Adapter: convert error message',
-          ExceptionDetails: error.message
-        });
-
+        LoggerUtils.logSimpleErrorEvent(LogEvent.ACS_SDK_CHATCLIENT_ERROR, 'ACS Adapter: convert error message', error);
         return activity;
       };
 
@@ -159,13 +107,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
       ): Promise<void | ACSDirectLineActivity> => {
         const activity = await createTypingMessageToDirectLineActivityMapper({ getState })()(message);
 
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_TYPING_MESSAGE,
-          Description: 'ACS Adapter: convert typing message.',
-          MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: message.receivedOn.toISOString(),
-          ChatThreadId: message.threadId
-        });
+        LoggerUtils.logConvertTypingMessage(message);
 
         return activity;
       };
@@ -173,20 +115,14 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
       const convertThreadDelete = async (event: ChatThreadDeletedEvent): Promise<void | ACSDirectLineActivity> => {
         const activity = await createThreadDeleteToDirectLineActivityMapper({ getState })()(event);
 
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_THREAD_DELETED,
-          Description: 'ACS Adapter: convert thread delete',
-          ACSRequesterUserId: (event.deletedBy.id as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: event.deletedOn.toISOString(),
-          ChatThreadId: event.threadId
-        });
+        LoggerUtils.logConvertThreadDelete(event);
 
         return activity;
       };
 
       const sendErrorActivity = async (unsubscribed: boolean, next: any, error: Error): Promise<void> => {
         const activity = await convertErrorMessage(error);
-        if (!unsubscribed) { 
+        if (!unsubscribed) {
           next(activity);
         }
       };
@@ -387,22 +323,31 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
                 // Ready state is closed so skip polling.
                 if (getReadyState() === ReadyState.CLOSED) {
-                  logAdapterPollingSkipped(getState, 'ACS Adapter: Polling skipped because of thread deletion.');
+                  LoggerUtils.logAdapterPollingSkipped(
+                    getState,
+                    'ACS Adapter: Polling skipped because of thread deletion.'
+                  );
                   return;
                 }
 
                 try {
                   if (!previousPollingCallTimerFinished) {
-                    logAdapterPollingSkipped(getState, 'ACS Adapter: Polling call issued too soon: skipping');
+                    LoggerUtils.logAdapterPollingSkipped(
+                      getState,
+                      'ACS Adapter: Polling call issued too soon: skipping'
+                    );
                     return;
                   }
 
                   if (!messagePollingInstance?.getIsPollingEnabled()) {
-                    logAdapterPollingSkipped(getState, 'ACS Adapter: Polling call disabled from the client: skipping');
+                    LoggerUtils.logAdapterPollingSkipped(
+                      getState,
+                      'ACS Adapter: Polling call disabled from the client: skipping'
+                    );
                     return;
                   }
 
-                  logSendPollingRequest(getState);
+                  LoggerUtils.logSendPollingRequest(getState);
                   const iterator = chatThreadClient.listMessages({
                     ...telemetryOptions,
                     startTime: startTime,
@@ -420,11 +365,11 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       }
                       const isProcessed = isDuplicateMessage(message, messageCache, fileManager);
                       if (isProcessed) {
-                        logSkipProcessedPolledMessage(getState, message.id);
+                        LoggerUtils.logSkipProcessedPolledMessage(getState, message.id);
                       } else {
-                        logProcessingPolledMessage(getState, message.id);
+                        LoggerUtils.logProcessingPolledMessage(getState, message.id);
                         if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                          logCachePolledHistoryMessage(getState, message.id);
+                          LoggerUtils.logCachePolledHistoryMessage(getState, message.id);
                           polledHistoryMessagesBeforeWebChatInit.push(message);
                           result = await iterator.next();
                           continue;
@@ -447,7 +392,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   }
                 } catch (exception) {
                   pollingException = exception;
-                  logPollingMessageFetchFailed(getState, exception);
+                  LoggerUtils.logPollingMessageFetchFailed(getState, exception);
                   ErrorEventSubscriber.notifyErrorEvent({
                     StatusCode: exception.response?.status,
                     ErrorType: AdapterErrorEventType.MESSAGE_POLLING_FAILED,
@@ -470,7 +415,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   if (!messagePollingInstance?.stopPolling() && (!pollingException || isPollable(statusCode))) {
                     // If there is a poll active, we cancel it and schedule next one after specified timeout.
                     if (pollingCallbackId) {
-                      logCancellingPollingCallback(getState, pollingCallbackId);
+                      LoggerUtils.logCancelPollingCallback(
+                        getState,
+                        'ACS Adapter: Canceling polling callback with Id ' + pollingCallbackId
+                      );
                       clearTimeout(pollingCallbackId);
                     }
                     pollingCallbackId = window.setTimeout(
@@ -484,10 +432,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       iteration <= initialPollingOptimizationCount ? 1000 : delaytm
                     );
 
-                    logPollingCallbackCreated(getState, pollingCallbackId);
+                    LoggerUtils.logPollingCallbackCreated(getState, pollingCallbackId);
                   } else {
                     if (messagePollingInstance?.stopPolling()) {
-                      logPollingCallStopped(getState);
+                      LoggerUtils.logPollingCallStopped(getState);
                     }
                     // Status code is not pollable as the thread is deleted or user doesn't have permission any more.
                     setReadyState(ReadyState.CLOSED);
@@ -496,13 +444,16 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               };
 
               const isPollable = (statusCode: number): boolean => {
-                logPollingStatusCode(getState, statusCode);
+                LoggerUtils.logPollingStatusCode(getState, statusCode);
                 return !(statusCode === 401 || statusCode === 403 || statusCode === 404);
               };
 
               const reinitializePolling = async (): Promise<void> => {
                 if (pollingCallbackId) {
-                  logCancelPolling(getState, pollingCallbackId);
+                  LoggerUtils.logCancelPollingCallback(
+                    getState,
+                    'ACS Adapter: Canceling polling in RTN connected callback Id ' + pollingCallbackId
+                  );
                   clearTimeout(pollingCallbackId);
                 }
                 await pollForMessages(getState(StateKey.PollingInterval), chatThreadClient);
@@ -512,21 +463,17 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 const eventManager: EventManager = getState(StateKey.EventManager);
                 eventManager?.addEventListener('online', async () => {
                   const disconnectDateTime: Date = getState(StateKey.DisconnectUTC);
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.NETWORK_ONLINE,
-                    Description: `ACS Adapter: ACS Chat reconnected event since disconnect at ${disconnectDateTime}`,
-                    TimeStamp: new Date().toISOString()
-                  });
+                  LoggerUtils.logSimpleDebugEvent(
+                    LogEvent.NETWORK_ONLINE,
+                    `ACS Adapter: ACS Chat reconnected event since disconnect at ${disconnectDateTime}`
+                  );
                   if (disconnectDateTime) {
                     setState(StateKey.DisconnectUTC, undefined);
                     if (pollingCallbackId) {
-                      Logger.logEvent(LogLevel.INFO, {
-                        Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
-                        Description: 'ACS Adapter: Canceling polling in network connected Id ' + pollingCallbackId,
-                        TimeStamp: new Date().toISOString(),
-                        ChatThreadId: getState(StateKey.ThreadId),
-                        ACSRequesterUserId: getState(StateKey.UserId)
-                      });
+                      LoggerUtils.logCancelPollingCallback(
+                        getState,
+                        'ACS Adapter: Canceling polling in network connected Id ' + pollingCallbackId
+                      );
                       clearTimeout(pollingCallbackId);
                     }
 
@@ -538,21 +485,18 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               };
 
               const onRealtimeNotificationConnected = async (): Promise<void> => {
-                Logger.logEvent(LogLevel.DEBUG, {
-                  Event: LogEvent.ACS_ADAPTER_REALTIME_NOTIFICATION_CONNECTED,
-                  Description: `ACS Adapter: Realtime notification connected`,
-                  TimeStamp: new Date().toISOString()
-                });
+                LoggerUtils.logSimpleDebugEvent(
+                  LogEvent.ACS_ADAPTER_REALTIME_NOTIFICATION_CONNECTED,
+                  `ACS Adapter: Realtime notification connected`
+                );
                 await reinitializePolling();
               };
 
               const onRealtimeNotificationDisconnected = async (): Promise<void> => {
-                rtnDisconnectTime = new Date();
-                Logger.logEvent(LogLevel.DEBUG, {
-                  Event: LogEvent.ACS_ADAPTER_REALTIME_NOTIFICATION_DISCONNECTED,
-                  Description: `ACS Adapter: Realtime notification disconnected`,
-                  TimeStamp: rtnDisconnectTime.toISOString()
-                });
+                LoggerUtils.logSimpleDebugEvent(
+                  LogEvent.ACS_ADAPTER_REALTIME_NOTIFICATION_DISCONNECTED,
+                  `ACS Adapter: Realtime notification disconnected`
+                );
               };
 
               const subscribeQueueDownloadAttachmentEvent = async (): Promise<void> => {
@@ -567,22 +511,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 const eventManager: EventManager = getState(StateKey.EventManager);
                 eventManager?.addEventListener('acs-attachment-downloaded', async (event: CustomEvent) => {
                   const { chatMessage, files }: { chatMessage: ChatMessage; files: File[] } = event.detail.payload;
-                  Logger.logEvent(LogLevel.INFO, {
-                    Event: LogEvent.ACS_ADAPTER_ATTACHMENT_DOWNLOADED,
-                    Description: 'ACS Adapter: Attachment downloaded ' + files?.map((file) => file.name).join(','),
-                    MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
-                    TimeStamp: chatMessage.createdOn.toISOString(),
-                    ChatMessageId: chatMessage.id
-                  });
+                  LoggerUtils.logAttachmentDownloaded(chatMessage, files);
                   const activity = (await convertHistoryAttachmentMessage(chatMessage, files)) as ACSDirectLineActivity;
                   if (activity) {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_ADAPTER_POST_FILE_ACTIVITY,
-                      Description: 'ACS Adapter: Post file attachment activity, messageId: ' + activity.messageid,
-                      MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
-                      TimeStamp: chatMessage.createdOn.toISOString(),
-                      ChatMessageId: chatMessage.id
-                    });
+                    LoggerUtils.logPostFileActivity(chatMessage, activity);
                     next(activity);
                   }
                 });
@@ -591,18 +523,21 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const subscribeWebChatInitCompleted = async (): Promise<void> => {
                 const eventManager: EventManager = getState(StateKey.EventManager);
                 eventManager?.addEventListener('webchat-status-connected', async () => {
-                  logWebChatConnectedEvent();
+                  LoggerUtils.logSimpleDebugEvent(
+                    LogEvent.WEBCHAT_STATUS_CONNECTED,
+                    `ACS Adapter: Event Webchat connected received`
+                  );
                   // Process messages for handling cached paged response messages
                   while (PagedHistoryMessagesBeforeWebChatInit.length > 0) {
                     const historyMessage: ChatMessage = PagedHistoryMessagesBeforeWebChatInit.pop();
-                    logProcessCachedPagedHistoryMessage(getState, historyMessage);
+                    LoggerUtils.logProcessCachedPagedHistoryMessage(getState, historyMessage);
                     const logDescription = 'ACS Adapter: Post activity, paged history message with Id: ';
                     convertAndProcessHistoryMessageByType(historyMessage, getState, next, logDescription);
                   }
                   // Process messages for handling cached polled response messages
                   while (polledHistoryMessagesBeforeWebChatInit.length > 0) {
                     const historyMessage: ChatMessage = polledHistoryMessagesBeforeWebChatInit.pop();
-                    logProcessPolledCachedHistoryMessage(getState, historyMessage);
+                    LoggerUtils.logProcessPolledCachedHistoryMessage(getState, historyMessage);
                     updateMessageCacheWithMessage(historyMessage, messageCache, fileManager);
 
                     const logDescription = 'ACS Adapter: Post activity, history messageId: ' + historyMessage.id;
@@ -613,7 +548,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   while (newMessagesBeforeWebChatInit.length > 0) {
                     const pendingMessageEvent = newMessagesBeforeWebChatInit.pop();
                     if (isParticipantsAddedEvent(pendingMessageEvent)) {
-                      logProcessCachedParticipantsAddedEvent(pendingMessageEvent);
+                      LoggerUtils.logProcessCachedParticipantsAddedEvent(pendingMessageEvent);
                       processParticipants(
                         pendingMessageEvent.participantsAdded,
                         Constants.PARTICIPANT_JOINED,
@@ -621,7 +556,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                         next
                       );
                     } else if (isParticipantsRemovedEvent(pendingMessageEvent)) {
-                      logProcessCachedParticipantsRemovedEvent(pendingMessageEvent);
+                      LoggerUtils.logProcessCachedParticipantsRemovedEvent(pendingMessageEvent);
                       processParticipants(
                         pendingMessageEvent.participantsRemoved,
                         Constants.PARTICIPANT_LEFT,
@@ -629,7 +564,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                         next
                       );
                     } else if ('message' in pendingMessageEvent) {
-                      logProcessCachedTextMessage(pendingMessageEvent);
+                      LoggerUtils.logProcessCachedTextMessage(pendingMessageEvent);
                       await onMessageReceived(pendingMessageEvent);
                     }
                   }
@@ -639,28 +574,14 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const onMessageReceived = async (event: ChatMessageReceivedEvent): Promise<void> => {
                 // If same user has multiple chats only send incoming messages for the current thread
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.MESSAGE_RECEIVED,
-                    Description: `ACS Adapter: Received a message with id ${event.id}`,
-                    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-                    TimeStamp: event.createdOn.toISOString(),
-                    ChatThreadId: event.threadId,
-                    ChatMessageId: event.id
-                  });
+                  LoggerUtils.logMessageReceived(event);
 
                   if (!fileManager) {
                     fileManager = getState(StateKey.FileManager);
                   }
 
                   if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.CACHE_NEW_MESSAGE,
-                      Description: 'ACS Adapter: Cache new message',
-                      TimeStamp: new Date().toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ACSRequesterUserId: getState(StateKey.UserId),
-                      ChatMessageId: event.id
-                    });
+                    LoggerUtils.logCacheNewMessage(event, getState);
                     newMessagesBeforeWebChatInit.push(event);
                     return;
                   }
@@ -674,14 +595,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   );
 
                   if (isProcessed) {
-                    Logger.logEvent(LogLevel.INFO, {
-                      Event: LogEvent.ACS_SKIP_NEW_MESSAGE,
-                      Description: `ACS Adapter: Skipping RTN message, already processed`,
-                      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-                      TimeStamp: new Date().toISOString(),
-                      ChatThreadId: getState(StateKey.ThreadId),
-                      ChatMessageId: event.id
-                    });
+                    LoggerUtils.logSkipNewMessage(event, getState);
                     return;
                   }
                   const activity = await convertMessage(event);
@@ -696,13 +610,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 if (userId === getState(StateKey.UserId)) return;
 
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.TYPING_MESSAGE_RECEIVED,
-                    Description: `ACS Adapter: Received a typing message`,
-                    MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-                    TimeStamp: event.receivedOn.toISOString(),
-                    ChatThreadId: event.threadId
-                  });
+                  LoggerUtils.logTypingMessageReceived(event);
                   const activity = await convertTypingMessage(event);
                   next(activity);
                 }
@@ -710,7 +618,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
               const onMessageDeleted = async (event: ChatMessageDeletedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  logMessageDeletedEventReceived(event);
+                  LoggerUtils.logMessageDeletedEventReceived(event);
 
                   const messageToCheck = { ...event, message: '' };
                   const isProcessed = cacheTextMessageIfNeeded(
@@ -721,7 +629,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     LogEvent.ACS_PROCESSING_DELETED_MESSAGE
                   );
                   if (isProcessed) {
-                    logSkipProcessedDeletedMessageEvent(event, getState);
+                    LoggerUtils.logSkipProcessedDeletedMessageEvent(event, getState);
                     return;
                   }
 
@@ -734,7 +642,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
               const onMessageEdited = async (event: ChatMessageEditedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  logMessageEditEventReceived(event);
+                  LoggerUtils.logMessageEditEventReceived(event);
 
                   if (!fileManager) {
                     fileManager = getState(StateKey.FileManager);
@@ -747,7 +655,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     LogEvent.ACS_PROCESSING_EDITED_MESSAGE
                   );
                   if (isProcessed) {
-                    logSkipProcessedEditEvent(event, getState);
+                    LoggerUtils.logSkipProcessedEditEvent(event, getState);
                     return;
                   }
 
@@ -762,7 +670,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 event: StreamingChatMessageChunkReceivedEvent
               ): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  logStreamingMessageChunkEventReceived(event);
+                  LoggerUtils.logStreamingMessageChunkEventReceived(event);
 
                   if (!fileManager) {
                     fileManager = getState(StateKey.FileManager);
@@ -778,7 +686,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   );
 
                   if (isProcessed) {
-                    logStreamingMessageChunkEventAlreadyProcessed(event);
+                    LoggerUtils.logStreamingMessageChunkEventAlreadyProcessed(event);
                     return;
                   }
 
@@ -796,15 +704,15 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const onParticipantsAdded = async (event: ParticipantsAddedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
                   if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                    logCacheParticipantsAddedEvent(event);
+                    LoggerUtils.logCacheParticipantsAddedEvent(event);
                     newMessagesBeforeWebChatInit.push(event);
                     return;
                   }
-                  logParticipantAddedEventReceived(event);
+                  LoggerUtils.logParticipantAddedEventReceived(event);
 
                   const isProcessed = cacheParticipantAddedEventIfNeeded(messageCache, event, getState);
                   if (isProcessed) {
-                    logParticipantAddedEventAlreadyProcessed(getState, event);
+                    LoggerUtils.logParticipantAddedEventAlreadyProcessed(getState, event);
                     return;
                   }
                   processParticipants(event.participantsAdded, Constants.PARTICIPANT_JOINED, getState, next);
@@ -814,15 +722,15 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const onParticipantsRemoved = async (event: ParticipantsRemovedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
                   if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                    logCacheParticipantRemovedEvent(event);
+                    LoggerUtils.logCacheParticipantRemovedEvent(event);
                     newMessagesBeforeWebChatInit.push(event);
                     return;
                   }
 
-                  logParticipantRemovedEventReceived(event);
+                  LoggerUtils.logParticipantRemovedEventReceived(event);
                   const isProcessed = cacheParticipantRemovedEventIfNeeded(messageCache, event, getState);
                   if (isProcessed) {
-                    logParticipantRemovedEventAlreadyProcessed(getState, event);
+                    LoggerUtils.logParticipantRemovedEventAlreadyProcessed(getState, event);
                     return;
                   }
 
@@ -832,71 +740,52 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
               const onChatThreadDeleted = async (event: ChatThreadDeletedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  Logger.logEvent(LogLevel.DEBUG, {
-                    Event: LogEvent.THREAD_DELETED_RECEIVED,
-                    Description: `ACS Adapter: Received a thread deleted event`,
-                    ACSRequesterUserId: (event.deletedBy.id as CommunicationUserIdentifier).communicationUserId,
-                    TimeStamp: event.deletedOn.toISOString(),
-                    ChatThreadId: event.threadId
-                  });
+                  LoggerUtils.logThreadDeletedReceived(event);
                   const activity = await convertThreadDelete(event);
                   next(activity);
                 }
               };
 
               chatClient.on('chatMessageReceived', onMessageReceived);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_NEW_MESSAGE,
-                Description: `ACS Adapter: Registering on new message success`
-              });
+              LoggerUtils.logRegisterToEvent(LogEvent.REGISTER_ON_NEW_MESSAGE, `new message`);
+
               chatClient.on('typingIndicatorReceived', onTypingMessageReceived);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_TYPING_INDICATOR,
-                Description: `ACS Adapter: Registering on typing indicator success`
-              });
+              LoggerUtils.logRegisterToEvent(LogEvent.REGISTER_ON_TYPING_INDICATOR, `typing indicator`);
+
               chatClient.on('chatMessageEdited', onMessageEdited);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_MESSAGE_EDIT,
-                Description: `ACS Adapter: Registering on message edit success`
-              });
+              LoggerUtils.logRegisterToEvent(LogEvent.REGISTER_ON_MESSAGE_EDIT, `message edit`);
+
               chatClient.on('chatMessageDeleted', onMessageDeleted);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_MESSAGE_DELETED,
-                Description: `ACS Adapter: Registering on message delete success`
-              });
+              LoggerUtils.logRegisterToEvent(LogEvent.REGISTER_ON_MESSAGE_DELETED, `message delete`);
+
               chatClient.on('chatThreadDeleted', onChatThreadDeleted);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_THREAD_DELETED,
-                Description: `ACS Adapter: Registering on thread delete success`
-              });
+              LoggerUtils.logRegisterToEvent(LogEvent.REGISTER_ON_THREAD_DELETED, `thread delete`);
+
               chatClient.on('realTimeNotificationConnected', onRealtimeNotificationConnected);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_REALTIME_NOTIFICATION_CONNECTED,
-                Description: `ACS Adapter: Registering on realtime notification connected`
-              });
+              LoggerUtils.logRegisterToEvent(
+                LogEvent.REGISTER_ON_REALTIME_NOTIFICATION_CONNECTED,
+                `realtime notification connected`
+              );
+
               chatClient.on('realTimeNotificationDisconnected', onRealtimeNotificationDisconnected);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_REALTIME_NOTIFICATION_DISCONNECTED,
-                Description: `ACS Adapter: Registering on realtime notification disconnected`
-              });
+              LoggerUtils.logRegisterToEvent(
+                LogEvent.REGISTER_ON_REALTIME_NOTIFICATION_DISCONNECTED,
+                `realtime notification disconnected`
+              );
+
               chatClient.on('streamingChatMessageChunkReceived', onStreamingMessageChunkReceived);
-              Logger.logEvent(LogLevel.DEBUG, {
-                Event: LogEvent.REGISTER_ON_STREAMING_CHAT_MESSAGE_CHUNK_RECEIVED,
-                Description: `ACS Adapter: Registering on streaming chat message chunk received`
-              });
+              LoggerUtils.logRegisterToEvent(
+                LogEvent.REGISTER_ON_STREAMING_CHAT_MESSAGE_CHUNK_RECEIVED,
+                `streaming chat message chunk received`
+              );
 
               // notify thread members add/leave notifcation if enableThreadMemberUpdateNotification is set
               if (adapterOptions?.enableThreadMemberUpdateNotification) {
                 chatClient.on('participantsAdded', onParticipantsAdded);
-                Logger.logEvent(LogLevel.DEBUG, {
-                  Event: LogEvent.REGISTER_ON_PARTICIPANT_ADDED,
-                  Description: `ACS Adapter: Registering on participant added success`
-                });
+                LoggerUtils.logRegisterToEvent(LogEvent.REGISTER_ON_PARTICIPANT_ADDED, `participant added`);
+
                 chatClient.on('participantsRemoved', onParticipantsRemoved);
-                Logger.logEvent(LogLevel.DEBUG, {
-                  Event: LogEvent.REGISTER_ON_PARTICIPANT_REMOVED,
-                  Description: `ACS Adapter: Registering on participant removed success`
-                });
+                LoggerUtils.logRegisterToEvent(LogEvent.REGISTER_ON_PARTICIPANT_REMOVED, `participant removed`);
               }
 
               if (adapterOptions?.enableLeaveThreadOnWindowClosed) {
@@ -938,13 +827,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               } else {
                 // Poll for messages until we start receiving notifications
                 if (pollingCallbackId) {
-                  Logger.logEvent(LogLevel.INFO, {
-                    Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
-                    Description: 'ACS Adapter: Canceling polling, if any, at the start ' + pollingCallbackId,
-                    TimeStamp: new Date().toISOString(),
-                    ChatThreadId: getState(StateKey.ThreadId),
-                    ACSRequesterUserId: getState(StateKey.UserId)
-                  });
+                  LoggerUtils.logCancelPollingCallback(
+                    getState,
+                    'ACS Adapter: Canceling polling, if any, at the start ' + pollingCallbackId
+                  );
                   clearTimeout(pollingCallbackId);
                 }
                 pollForMessages(getState(StateKey.PollingInterval), chatThreadClient);

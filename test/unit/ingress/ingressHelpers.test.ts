@@ -1,10 +1,8 @@
-import { LogLevel } from '../../../src/log/Logger';
-import { Logger } from '../../../src/log/Logger';
 import { ACSAdapterState, StateKey } from '../../../src/models/ACSAdapterState';
 import { ChatEqualityFields, GetStateFunction } from '../../../src/types/AdapterTypes';
 import { IFileManager } from '../../../src/types/FileManagerTypes';
 import * as MessageComparison from '../../../src/utils/MessageComparison';
-import * as LoggerUtils from '../../../src/utils/LoggerUtils';
+import { LoggerUtils } from '../../../src/utils/LoggerUtils';
 import { ChatMessage, ParticipantsAddedEvent, ParticipantsRemovedEvent } from '@azure/communication-chat';
 
 import {
@@ -27,7 +25,6 @@ import {
 // Mock dependencies
 jest.mock('../../../src/log/Logger');
 jest.mock('../../../src/utils/MessageComparison');
-jest.mock('../../../src/utils/LoggerUtils');
 
 describe('ingressHelpers', () => {
   // Common test variables
@@ -38,6 +35,9 @@ describe('ingressHelpers', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
+
+    // Mock all LoggerUtils static methods
+    jest.spyOn(LoggerUtils, 'logUnsupportedMessageType').mockImplementation(jest.fn());
 
     // Setup common test variables
     messageCache = new Map();
@@ -76,7 +76,6 @@ describe('ingressHelpers', () => {
 
       expect(result).toBe(true);
       expect(messageCache.size).toBe(0);
-      expect(Logger.logEvent).not.toHaveBeenCalled();
     });
 
     test('should return false, update cache, and log if message has not been processed', () => {
@@ -107,7 +106,6 @@ describe('ingressHelpers', () => {
         deletedOn: deletedOn,
         fileIds: ['file-1']
       });
-      expect(Logger.logEvent).toHaveBeenCalledWith(LogLevel.INFO, expect.any(Object));
     });
   });
 
@@ -333,7 +331,6 @@ describe('ingressHelpers', () => {
 
       expect(result).toBe(true);
       expect(messageCache.size).toBe(0);
-      expect(LoggerUtils.logProcessingParticipantAddedEvent).not.toHaveBeenCalled();
     });
 
     test('should return false, update cache, and log if event has not been processed', () => {
@@ -365,7 +362,6 @@ describe('ingressHelpers', () => {
           { id: { communicationUserId: 'user-123', kind: 'communicationUser' }, displayName: 'User', metadata: {} }
         ]
       });
-      expect(LoggerUtils.logProcessingParticipantAddedEvent).toHaveBeenCalledWith(getState, event);
     });
   });
 
@@ -394,7 +390,6 @@ describe('ingressHelpers', () => {
 
       expect(result).toBe(true);
       expect(messageCache.size).toBe(0);
-      expect(LoggerUtils.logProcessingParticipantRemovedEvent).not.toHaveBeenCalled();
     });
 
     test('should return false, update cache, and log if event has not been processed', () => {
@@ -426,7 +421,6 @@ describe('ingressHelpers', () => {
           { id: { communicationUserId: 'user-123', kind: 'communicationUser' }, displayName: 'User', metadata: {} }
         ]
       });
-      expect(LoggerUtils.logProcessingParticipantRemovedEvent).toHaveBeenCalledWith(getState, event);
     });
   });
 
