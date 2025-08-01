@@ -18,6 +18,7 @@ import { StateKey } from '../../models/ACSAdapterState';
 import EventManager from '../../utils/EventManager';
 import { Logger, LogLevel } from '../../log/Logger';
 import { LogEvent } from '../../types/LogTypes';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 
 export enum ConnectionStatus {
   Uninitialized = 0,
@@ -53,11 +54,7 @@ export default function exportDLJSInterface<TAdapterState extends AdapterState>(
       adapter.setState(StateKey.WebChatStatus, ConnectionStatus.Uninitialized);
       adapter.addEventListener('open', async () => {
         const eventManager: EventManager = adapter.getState(StateKey.EventManager);
-
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ADAPTER_STATE_UPDATE,
-          Description: `Adapter state has been changed to open`
-        });
+        LoggerUtils.logAdapterStateUpdate(`Adapter state has been changed to open`);
 
         if (!connectionStatusObserver) {
           let waitTime = 5;
@@ -67,26 +64,21 @@ export default function exportDLJSInterface<TAdapterState extends AdapterState>(
             waitTime = waitTime * 2;
           }
           if (!connectionStatusObserver) {
-            Logger.logEvent(LogLevel.ERROR, {
-              Event: LogEvent.WEBCHAT_SUBSCRIPTION_TIMEOUT,
-              Description: `WebChat couldn't subscribe to connection status changes in ${connectionStatusObserverWaitTime} ms`
-            });
+            LoggerUtils.logWebChatSubscriptionTimeout(
+              `WebChat couldn't subscribe to connection status changes in ${connectionStatusObserverWaitTime} ms`
+            );
             eventManager.handleError(new Error('WebChat subscription timeout to connection status changes'));
             adapter.setState(StateKey.WebChatStatus, ConnectionStatus.FailedToConnect);
           } else {
-            Logger.logEvent(LogLevel.INFO, {
-              Event: LogEvent.WEBCHAT_SUBSCRIPTION_SUCCESS,
-              Description: `WebChat subscribed to connection status changes in ${waitTime} ms`
-            });
+            LoggerUtils.logWebChatSubscriptionSuccess(
+              `WebChat subscribed to connection status changes in ${waitTime} ms`
+            );
             connectionStatusObserver.next(ConnectionStatus.Connected);
             adapter.setState(StateKey.WebChatStatus, ConnectionStatus.Connected);
             eventManager.raiseCustomEvent('webchat-status-connected', {});
           }
         } else {
-          Logger.logEvent(LogLevel.INFO, {
-            Event: LogEvent.WEBCHAT_SUBSCRIPTION_SUCCESS,
-            Description: `WebChat already connected`
-          });
+          LoggerUtils.logWebChatSubscriptionSuccess(`WebChat already connected`);
           connectionStatusObserver.next(ConnectionStatus.Connected);
           adapter.setState(StateKey.WebChatStatus, ConnectionStatus.Connected);
           eventManager.raiseCustomEvent('webchat-status-connected', {});
@@ -94,10 +86,7 @@ export default function exportDLJSInterface<TAdapterState extends AdapterState>(
       });
 
       adapter.addEventListener('error', () => {
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ADAPTER_STATE_UPDATE,
-          Description: `Adapter state has been changed to error`
-        });
+        LoggerUtils.logAdapterStateUpdate(`Adapter state has been changed to error`);
         const connectionStatus =
           adapter.getReadyState() === ReadyState.CLOSED
             ? ConnectionStatus.FailedToConnect

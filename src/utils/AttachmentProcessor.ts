@@ -1,10 +1,10 @@
 import { ChatMessage } from '@azure/communication-chat';
-import { CommunicationUserIdentifier } from '@azure/communication-common';
 import { ACSAdapterState, StateKey } from '..';
 import { downloadAttachmentsDirect } from '../ingress/ingressHelpers';
 import { Logger, LogLevel } from '../log/Logger';
 import { AdapterOptions, FileMetadata, GetStateFunction, IFileManager, IUploadedFile, LogEvent } from '../types';
 import EventManager, { CustomEvent } from './EventManager';
+import { LoggerUtils } from '../utils/LoggerUtils';
 
 export const queueAttachmentDownloading = async (
   event: CustomEvent,
@@ -30,16 +30,12 @@ export const queueAttachmentDownloading = async (
       if (fileIdsToDownload?.length <= 0) {
         return;
       }
-      Logger.logEvent(LogLevel.INFO, {
-        Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-        Description:
-          'ACS Adapter: attachments download queued: ' +
-          fileIdsToDownload.map((file: IUploadedFile) => file.fileId).join(','), // remove content to protect sensitive user info
-        ACSRequesterUserId: getState(StateKey.UserId),
-        MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: chatMessage.createdOn.toISOString(),
-        ChatMessageId: chatMessage.id
-      });
+      LoggerUtils.logAttachmentEvent(
+        getState,
+        chatMessage,
+        'ACS Adapter: attachments download queued: ' +
+          fileIdsToDownload.map((file: IUploadedFile) => file.fileId).join(',') // remove content to protect sensitive user info,
+      );
       files = await downloadAttachmentsDirect(
         fileIdsToDownload,
         filemanager,
@@ -47,26 +43,21 @@ export const queueAttachmentDownloading = async (
         options?.shouldFileAttachmentDownloadTimeout,
         options?.fileAttachmentDownloadTimeout
       );
-      Logger.logEvent(LogLevel.INFO, {
-        Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-        Description: 'ACS Adapter: attachments downloaded: ', // remove content to protect sensitive user info
-        ACSRequesterUserId: getState(StateKey.UserId),
-        MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: chatMessage.createdOn.toISOString(),
-        ChatMessageId: chatMessage.id
-      });
+      LoggerUtils.logAttachmentEvent(
+        getState,
+        chatMessage,
+        'ACS Adapter: attachments downloaded: ' + fileIdsToDownload.map((file: IUploadedFile) => file.fileId).join(',') // remove content to protect sensitive user info);
+      );
       eventManager.raiseCustomEvent('acs-attachment-downloaded', { chatMessage, files });
     }
   } catch (exception) {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.ACS_ADAPTER_ATTACHMENT_DOWNLOAD_ERROR,
-      Description: 'ACS Adapter: Failed to download attachments',
-      ACSRequesterUserId: getState(StateKey.UserId),
-      MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
-      TimeStamp: chatMessage.createdOn.toISOString(),
-      ChatMessageId: chatMessage.id,
-      ExceptionDetails: exception
-    });
+    LoggerUtils.logAttachmentErrorEvent(
+      getState,
+      chatMessage,
+      LogEvent.ACS_ADAPTER_ATTACHMENT_DOWNLOAD_ERROR,
+      'ACS Adapter: Failed to download attachments',
+      exception
+    );
     if (options?.enableMessageErrorHandler) {
       const errorMessage = 'Failed to download attachments.';
       const error = new Error(errorMessage);
@@ -87,21 +78,19 @@ const findUnprocessedFileIds = (
 ): IUploadedFile[] => {
   const fileIdsToDownload: IUploadedFile[] = [];
   if (pendingFileDownloads) {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.ACS_ADAPTER_PROCESSED_ATTACHMENTS,
-      Description: `ACS Adapter: Attachments processed on this thread ${[...Object.keys(pendingFileDownloads)]}`,
-      TimeStamp: new Date().toISOString(),
-      ChatMessageId: messageId
-    });
+    LoggerUtils.logProcessingAttachments(
+      LogEvent.ACS_ADAPTER_PROCESSED_ATTACHMENTS,
+      `ACS Adapter: Attachments processed on this thread ${[...Object.keys(pendingFileDownloads)]}`,
+      messageId
+    );
   }
   if (!Object.prototype.hasOwnProperty.call(pendingFileDownloads, messageId)) {
     pendingFileDownloads[messageId] = new Map<string, FileMetadata>();
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.ACS_ADAPTER_ATTACHMENT_NEW,
-      Description: `ACS Adapter: New attachment download ${fileIds?.join(',')}`,
-      TimeStamp: new Date().toISOString(),
-      ChatMessageId: messageId
-    });
+    LoggerUtils.logProcessingAttachments(
+      LogEvent.ACS_ADAPTER_ATTACHMENT_NEW,
+      `ACS Adapter: New attachment download ${fileIds?.join(',')}`,
+      messageId
+    );
     for (let i = 0; i < fileIds.length; ++i) {
       fileIdsToDownload.push({ fileId: fileIds[i], metadata: fileMetadata[i] });
       pendingFileDownloads[messageId].set(fileIds[i], fileMetadata[i]);
@@ -114,6 +103,5 @@ const findUnprocessedFileIds = (
       }
     }
   }
-
   return fileIdsToDownload;
 };

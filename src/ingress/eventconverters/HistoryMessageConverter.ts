@@ -107,6 +107,6 @@ const convertHistoryTextMessage = async (
   getState: GetStateFunction<ACSAdapterState>
 ): Promise<void | ACSDirectLineActivity> => {
   const activity = await createHistoryMessageToDirectLineActivityMapper({ getState })()(message);
-  LoggerUtils.logConvertHistoryTextMessage(message);
+  LoggerUtils.logConvertHistoryMessage(message, 'ACS Adapter: convert history message');
   return activity;
 };

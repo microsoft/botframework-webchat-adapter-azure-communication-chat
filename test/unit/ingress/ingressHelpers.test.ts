@@ -1,5 +1,4 @@
 import { LogLevel } from '../../../src/log/Logger';
-import { Logger } from '../../../src/log/Logger';
 import { ACSAdapterState, StateKey } from '../../../src/models/ACSAdapterState';
 import { ChatEqualityFields, GetStateFunction } from '../../../src/types/AdapterTypes';
 import { IFileManager } from '../../../src/types/FileManagerTypes';
@@ -42,6 +41,7 @@ describe('ingressHelpers', () => {
     jest.spyOn(LoggerUtils, 'logUnsupportedMessageType').mockImplementation(jest.fn());
     jest.spyOn(LoggerUtils, 'logProcessingParticipantAddedEvent').mockImplementation(jest.fn());
     jest.spyOn(LoggerUtils, 'logProcessingParticipantRemovedEvent').mockImplementation(jest.fn());
+    jest.spyOn(LoggerUtils, 'logProcessingTextMessage').mockImplementation(jest.fn());
 
     // Setup common test variables
     messageCache = new Map();
@@ -80,7 +80,7 @@ describe('ingressHelpers', () => {
 
       expect(result).toBe(true);
       expect(messageCache.size).toBe(0);
-      expect(Logger.logEvent).not.toHaveBeenCalled();
+      expect(LoggerUtils.logProcessingTextMessage).not.toHaveBeenCalled();
     });
 
     test('should return false, update cache, and log if message has not been processed', () => {
@@ -111,7 +111,7 @@ describe('ingressHelpers', () => {
         deletedOn: deletedOn,
         fileIds: ['file-1']
       });
-      expect(Logger.logEvent).toHaveBeenCalledWith(LogLevel.INFO, expect.any(Object));
+      expect(LoggerUtils.logProcessingTextMessage).toHaveBeenCalledWith(LogLevel.INFO, expect.any(Object));
     });
   });
 

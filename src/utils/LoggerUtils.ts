@@ -7,13 +7,19 @@ import {
   ChatMessageEditedEvent,
   ChatMessageReceivedEvent,
   ChatParticipant,
+  ChatThreadDeletedEvent,
   ParticipantsAddedEvent,
   ParticipantsRemovedEvent,
-  StreamingChatMessageChunkReceivedEvent
+  SendMessageRequest,
+  SendTypingNotificationOptions,
+  StreamingChatMessageChunkReceivedEvent,
+  TypingIndicatorReceivedEvent
 } from '@azure/communication-chat';
 import { ACSAdapterState, StateKey } from '../models/ACSAdapterState';
 import { GetStateFunction } from '../types/AdapterTypes';
 import { ChatEventMessage } from './ConvertMessageUtils';
+import { ACSDirectLineActivity } from '../models/ACSDirectLineActivity';
+import { ProcessChatMessageEventProps } from '../ingress/ingressHelpers';
 
 export class LoggerUtils {
   static logConvertStreamingMessageChunkEvent = (event: StreamingChatMessageChunkReceivedEvent): void => {
@@ -92,6 +98,13 @@ export class LoggerUtils {
     });
   };
 
+  static logSimpleInfoEvent = (event: LogEvent, description: string): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: event,
+      Description: description
+    });
+  };
+
   static logConvertThreadUpdateEvent = (): void => {
     Logger.logEvent(LogLevel.INFO, {
       Event: LogEvent.ACS_ADAPTER_CONVERT_THREAD_UPDATED,
@@ -114,10 +127,10 @@ export class LoggerUtils {
     });
   };
 
-  static logConvertHistoryTextMessage = (chatMessage: ChatMessage): void => {
+  static logConvertHistoryMessage = (chatMessage: ChatMessage, description: string): void => {
     Logger.logEvent(LogLevel.INFO, {
       Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-      Description: 'ACS Adapter: convert history message:',
+      Description: description,
       CustomProperties: chatMessage, // remove content to protect sensitive user info
       MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
       TimeStamp: chatMessage.createdOn.toISOString(),
@@ -155,19 +168,6 @@ export class LoggerUtils {
     });
   };
 
-  static logCancellingPollingCallback = (
-    getState: GetStateFunction<ACSAdapterState>,
-    pollingCallbackId: number
-  ): void => {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
-      Description: 'ACS Adapter: Canceling polling callback with Id ' + pollingCallbackId,
-      TimeStamp: new Date().toISOString(),
-      ChatThreadId: getState(StateKey.ThreadId),
-      ACSRequesterUserId: getState(StateKey.UserId)
-    });
-  };
-
   static logPollingCallbackCreated = (getState: GetStateFunction<ACSAdapterState>, pollingCallbackId: number): void => {
     Logger.logEvent(LogLevel.INFO, {
       Event: LogEvent.ACS_CREATE_POLLING_CALLBACK,
@@ -192,16 +192,6 @@ export class LoggerUtils {
     Logger.logEvent(LogLevel.INFO, {
       Event: LogEvent.ACS_ADAPTER_POLLING_STATUSCODE,
       Description: 'ACS Adapter: Polling status code ' + statusCode,
-      TimeStamp: new Date().toISOString(),
-      ChatThreadId: getState(StateKey.ThreadId),
-      ACSRequesterUserId: getState(StateKey.UserId)
-    });
-  };
-
-  static logCancelPolling = (getState: GetStateFunction<ACSAdapterState>, pollingCallbackId: number): void => {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
-      Description: 'ACS Adapter: Canceling polling in RTN connected callback Id ' + pollingCallbackId,
       TimeStamp: new Date().toISOString(),
       ChatThreadId: getState(StateKey.ThreadId),
       ACSRequesterUserId: getState(StateKey.UserId)
@@ -610,6 +600,517 @@ export class LoggerUtils {
     Logger.logEvent(LogLevel.ERROR, {
       Event: LogEvent.ACS_SDK_JOINTHREAD_ERROR,
       Description: `ACS Adapter: failed to join the thread.`
+    });
+  };
+
+  static logACSSDKReconnect = (): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_SDK_RECONNECT,
+      Description: `ACS Adapter: Reconnect to network.`
+    });
+  };
+
+  static logFileManagerUploadFileRequest = (getState: GetStateFunction<ACSAdapterState>, timestamp: string): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.FILEMANAGER_UPLOAD_FILE_REQUEST,
+      Description: `Sending upload file request`,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId)
+    });
+  };
+
+  static logFileManagerUploadFileFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    timestamp: string,
+    exception: Error
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.FILEMANAGER_UPLOAD_FILE_FAILED,
+      Description: `Uploading file failed`,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId),
+      ExceptionDetails: exception
+    });
+  };
+
+  static logEgressFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    timestamp: string,
+    messageId: string,
+    errorMessage: string
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_EGRESS_FAILED,
+      Description: errorMessage,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: messageId
+    });
+  };
+
+  static logEgressMessage = (
+    getState: GetStateFunction<ACSAdapterState>,
+    timestamp: string,
+    messageId: string
+  ): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_EGRESS_MESSAGE,
+      Description: 'Convert activity to egress ACS message',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: messageId
+    });
+  };
+
+  static logEgressSendMessage = (
+    getState: GetStateFunction<ACSAdapterState>,
+    timestamp: string,
+    messageId: string
+  ): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_EGRESS_SEND_MESSAGE,
+      Description: 'Convert activity to egress ACS message',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: messageId
+    });
+  };
+
+  static logEgressSendMessageSuccess = (
+    getState: GetStateFunction<ACSAdapterState>,
+    activity: ACSDirectLineActivity,
+    sendMessageRequest: SendMessageRequest,
+    sentResultId: string
+  ): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: LogEvent.ACS_ADAPTER_SEND_MESSAGE_SUCCESS,
+      Description: `Adapter: Successfully sent a message with messageid ${sentResultId}.`,
+      CustomProperties: sendMessageRequest,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: activity.messageid,
+      ClientActivityId: activity?.channelData?.clientActivityID as string
+    });
+  };
+
+  static logEgressSendMessageFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    activity: ACSDirectLineActivity,
+    sendMessageRequest: SendMessageRequest,
+    exception: Error
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_SEND_MESSAGE_FAILED,
+      Description: `Send message failed.`,
+      CustomProperties: sendMessageRequest,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: activity.messageid,
+      ClientActivityId: activity?.channelData?.clientActivityID as string,
+      ExceptionDetails: exception
+    });
+  };
+
+  static logEgressTypingFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    timestamp: string,
+    errorMessage: string
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_EGRESS_TYPING_FAILED,
+      Description: errorMessage,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId)
+    });
+  };
+
+  static logEgressTypingSendingRequest = (getState: GetStateFunction<ACSAdapterState>, timestamp: string): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: LogEvent.ACS_ADAPTER_EGRESS_TYPING_SENDING_REQUEST,
+      Description: 'ACS Adapter: Request sending a typing indication',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId)
+    });
+  };
+
+  static logIngressTypingSuccess = (getState: GetStateFunction<ACSAdapterState>, timestamp: string): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: LogEvent.ACS_ADAPTER_INGRESS_TYPING_SUCCESS,
+      Description: 'ACS Adapter: Successfully sent a typing indication',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: timestamp,
+      ChatThreadId: getState(StateKey.ThreadId)
+    });
+  };
+
+  static logEgressTypingSendFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    activity: ACSDirectLineActivity,
+    options: SendTypingNotificationOptions,
+    exception: Error
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_SEND_MESSAGE_FAILED,
+      Description: `Send message failed.`,
+      CustomProperties: options,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: activity.messageid,
+      ClientActivityId: activity?.channelData?.clientActivityID as string,
+      ExceptionDetails: exception
+    });
+  };
+
+  static logProcessingTextMessage = (
+    getState: GetStateFunction<ACSAdapterState>,
+    event: ProcessChatMessageEventProps,
+    processingLogEvent: LogEvent
+  ): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: processingLogEvent,
+      Description: `ACS Adapter: Processing message`,
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: event.id
+    });
+  };
+
+  static logACSReconnectError = (description: string, exception?: Error): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_SDK_CHATCLIENT_RECONNECT_ERROR,
+      Description: description,
+      ...(exception ? { ExceptionDetails: exception } : {})
+    });
+  };
+
+  static logHistoryMessageIngressFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    message: ChatMessage,
+    errorMessage: string
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
+      Description: errorMessage,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: message.createdOn.toISOString(),
+      ChatMessageId: message.id
+    });
+  };
+
+  static logQueueAttachmentDownloadFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    message: ChatMessage,
+    exception: Error
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
+      Description: 'Failed to queue attachments download',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: message.createdOn.toISOString(),
+      ChatMessageId: message.id,
+      ExceptionDetails: exception
+    });
+  };
+
+  static logUserMessageIngressFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    event: ChatMessageReceivedEvent,
+    errorMessage: string
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
+      Description: errorMessage,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.createdOn.toISOString(),
+      ChatThreadId: event.threadId,
+      ChatMessageId: event.id
+    });
+  };
+
+  static logRequestDownloadAttachments = (
+    getState: GetStateFunction<ACSAdapterState>,
+    event: ChatMessageReceivedEvent
+  ): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_REQUEST_DOWNLOAD_ATTACHMENTS,
+      Description: 'Preparing to download attachments',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.createdOn.toISOString(),
+      ChatThreadId: event.threadId,
+      ChatMessageId: event.id
+    });
+  };
+
+  static logDownloadAttachmentsFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    event: ChatMessageReceivedEvent,
+    exception: Error
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
+      Description: 'Failed to download attachments',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.createdOn.toISOString(),
+      ChatThreadId: event.threadId,
+      ChatMessageId: event.id,
+      ExceptionDetails: exception
+    });
+  };
+
+  static logAttachmentEvent = (
+    getState: GetStateFunction<ACSAdapterState>,
+    chatMessage: ChatMessage,
+    description: string
+  ): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
+      Description: description,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: chatMessage.createdOn.toISOString(),
+      ChatMessageId: chatMessage.id
+    });
+  };
+
+  static logAttachmentErrorEvent = (
+    getState: GetStateFunction<ACSAdapterState>,
+    chatMessage: ChatMessage,
+    eventType: LogEvent,
+    description: string,
+    exception: Error
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: eventType,
+      Description: description,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: chatMessage.createdOn.toISOString(),
+      ChatMessageId: chatMessage.id,
+      ExceptionDetails: exception
+    });
+  };
+
+  static logProcessingAttachments = (event: LogEvent, description: string, messageId: string): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: event,
+      Description: description,
+      TimeStamp: new Date().toISOString(),
+      ChatMessageId: messageId
+    });
+  };
+
+  static logProcessingStreamingChatMessageChunkError = (
+    event: StreamingChatMessageChunkReceivedEvent,
+    getState: GetStateFunction<ACSAdapterState>,
+    exception: Error
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_PROCESSING_STREAMING_CHAT_MESSAGE_CHUNK,
+      Description: 'Failed to parse StreamingChatMessageChunk metadata',
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.editedOn.toISOString(),
+      ChatThreadId: event.threadId,
+      ChatMessageId: event.id,
+      ExceptionDetails: exception
+    });
+  };
+
+  static logConvertMessage = (event: ChatMessageReceivedEvent): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_CONVERT_MESSAGE,
+      Description: `ACS Adapter: convert normal message`,
+      CustomProperties: event,
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.createdOn.toISOString(),
+      ChatThreadId: event.threadId,
+      ChatMessageId: event.id
+    });
+  };
+
+  static logAdapterStateUpdate = (description: string): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ADAPTER_STATE_UPDATE,
+      Description: description
+    });
+  };
+
+  static logWebChatSubscriptionSuccess = (description: string): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.WEBCHAT_SUBSCRIPTION_SUCCESS,
+      Description: description
+    });
+  };
+
+  static logWebChatSubscriptionTimeout = (description: string): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.WEBCHAT_SUBSCRIPTION_TIMEOUT,
+      Description: description
+    });
+  };
+
+  static logTypingMessageIngressFailed = (
+    getState: GetStateFunction<ACSAdapterState>,
+    message: TypingIndicatorReceivedEvent,
+    errorMessage: string
+  ): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
+      Description: errorMessage,
+      ACSRequesterUserId: getState(StateKey.UserId),
+      MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: message.receivedOn.toISOString(),
+      ChatThreadId: message.threadId
+    });
+  };
+
+  static logSDKChatClientError = (error: Error): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: LogEvent.ACS_SDK_CHATCLIENT_ERROR,
+      Description: 'ACS Adapter: convert error message',
+      ExceptionDetails: error.message
+    });
+  };
+
+  static logConvertTypingMessage = (message: TypingIndicatorReceivedEvent): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_CONVERT_TYPING_MESSAGE,
+      Description: 'ACS Adapter: convert typing message.',
+      MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: message.receivedOn.toISOString(),
+      ChatThreadId: message.threadId
+    });
+  };
+
+  static logConvertThreadDelete = (event: ChatThreadDeletedEvent): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_CONVERT_THREAD_DELETED,
+      Description: 'ACS Adapter: convert thread delete',
+      ACSRequesterUserId: (event.deletedBy.id as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.deletedOn.toISOString(),
+      ChatThreadId: event.threadId
+    });
+  };
+
+  static logNetworkOnline = (disconnectDateTime: Date): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: LogEvent.NETWORK_ONLINE,
+      Description: `ACS Adapter: ACS Chat reconnected event since disconnect at ${disconnectDateTime}`,
+      TimeStamp: new Date().toISOString()
+    });
+  };
+
+  static logCancelPollingCallback = (getState: GetStateFunction<ACSAdapterState>, description: string): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
+      Description: description,
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ACSRequesterUserId: getState(StateKey.UserId)
+    });
+  };
+
+  static logRTNStateChanged = (event: LogEvent, description: string): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: event,
+      Description: description,
+      TimeStamp: new Date().toISOString()
+    });
+  };
+
+  static logAttachmentDownloaded = (chatMessage: ChatMessage, files: File[]): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_ATTACHMENT_DOWNLOADED,
+      Description: 'ACS Adapter: Attachment downloaded ' + files?.map((file) => file.name).join(','),
+      MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: chatMessage.createdOn.toISOString(),
+      ChatMessageId: chatMessage.id
+    });
+  };
+
+  static logPostFileActivity = (chatMessage: ChatMessage, activity: ACSDirectLineActivity): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_ADAPTER_POST_FILE_ACTIVITY,
+      Description: 'ACS Adapter: Post file attachment activity, messageId: ' + activity.messageid,
+      MessageSender: (chatMessage.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: chatMessage.createdOn.toISOString(),
+      ChatMessageId: chatMessage.id
+    });
+  };
+
+  static logMessageReceived = (event: ChatMessageReceivedEvent): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: LogEvent.MESSAGE_RECEIVED,
+      Description: `ACS Adapter: Received a message with id ${event.id}`,
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.createdOn.toISOString(),
+      ChatThreadId: event.threadId,
+      ChatMessageId: event.id
+    });
+  };
+
+  static logCacheNewMessage = (event: ChatMessageReceivedEvent, getState: GetStateFunction<ACSAdapterState>): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.CACHE_NEW_MESSAGE,
+      Description: 'ACS Adapter: Cache new message',
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ACSRequesterUserId: getState(StateKey.UserId),
+      ChatMessageId: event.id
+    });
+  };
+
+  static logSkipNewMessage = (event: ChatMessageReceivedEvent, getState: GetStateFunction<ACSAdapterState>): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: LogEvent.ACS_SKIP_NEW_MESSAGE,
+      Description: `ACS Adapter: Skipping RTN message, already processed`,
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: new Date().toISOString(),
+      ChatThreadId: getState(StateKey.ThreadId),
+      ChatMessageId: event.id
+    });
+  };
+
+  static logTypingMessageReceived = (event: TypingIndicatorReceivedEvent): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: LogEvent.TYPING_MESSAGE_RECEIVED,
+      Description: `ACS Adapter: Received a typing message`,
+      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.receivedOn.toISOString(),
+      ChatThreadId: event.threadId
+    });
+  };
+
+  static logThreadDeletedReceived = (event: ChatThreadDeletedEvent): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: LogEvent.THREAD_DELETED_RECEIVED,
+      Description: `ACS Adapter: Received a thread deleted event`,
+      ACSRequesterUserId: (event.deletedBy.id as CommunicationUserIdentifier).communicationUserId,
+      TimeStamp: event.deletedOn.toISOString(),
+      ChatThreadId: event.threadId
+    });
+  };
+
+  static logRegisterToEvent = (event: LogEvent, eventDescription: string): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: event,
+      Description: `ACS Adapter: Registering on ${eventDescription}`
     });
   };
 }

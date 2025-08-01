@@ -1,14 +1,8 @@
-import {
-  CommunicationIdentifier,
-  CommunicationIdentifierKind,
-  CommunicationUserIdentifier,
-  getIdentifierKind
-} from '@azure/communication-common';
-import { Logger, LogLevel } from '../log/Logger';
+import { CommunicationIdentifier, CommunicationIdentifierKind, getIdentifierKind } from '@azure/communication-common';
 import { FileMetadata, IFileManager, IUploadedFile } from '../types/FileManagerTypes';
 import { LogEvent } from '../types/LogTypes';
 import EventManager from '../utils/EventManager';
-import { ACSAdapterState, StateKey } from '../models/ACSAdapterState';
+import { ACSAdapterState } from '../models/ACSAdapterState';
 import {
   checkDuplicateMessage,
   checkDuplicateParticipantMessage,
@@ -184,14 +178,7 @@ export const cacheTextMessageIfNeeded = (
     fileIds: fileManager?.getFileIds(event.metadata)
   });
   if (!isProcessed) {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: processingLogEvent,
-      Description: `ACS Adapter: Processing message`,
-      MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-      TimeStamp: new Date().toISOString(),
-      ChatThreadId: getState(StateKey.ThreadId),
-      ChatMessageId: event.id
-    });
+    LoggerUtils.logProcessingTextMessage(getState, event, processingLogEvent);
     messageCache.set(event.id, {
       content: event.message,
       updatedOn: event.editedOn,

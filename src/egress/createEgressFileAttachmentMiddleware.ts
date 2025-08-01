@@ -8,6 +8,7 @@ import { IFileManager } from '../types/FileManagerTypes';
 import { LogEvent } from '../types/LogTypes';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../types/ErrorEventTypes';
+import { LoggerUtils } from '../utils/LoggerUtils';
 
 export default function createEgressFileAttachmentMiddleware(): EgressMiddleware<
   ACSDirectLineActivity,
@@ -29,13 +30,7 @@ export default function createEgressFileAttachmentMiddleware(): EgressMiddleware
         uploadedFiles: []
       };
 
-      Logger.logEvent(LogLevel.ERROR, {
-        Event: LogEvent.FILEMANAGER_UPLOAD_FILE_FAILED,
-        Description: `Sending upload file request`,
-        ACSRequesterUserId: getState(StateKey.UserId),
-        TimeStamp: activity.timestamp,
-        ChatThreadId: getState(StateKey.ThreadId)
-      });
+      LoggerUtils.logFileManagerUploadFileRequest(getState, activity.timestamp);
 
       try {
         const uploadedFiles = await fileManager.uploadFiles(attachments);
@@ -43,14 +38,7 @@ export default function createEgressFileAttachmentMiddleware(): EgressMiddleware
         // Add the uploaded file data to the activity
         activity.channelData.uploadedFiles = uploadedFiles;
       } catch (exception) {
-        Logger.logEvent(LogLevel.ERROR, {
-          Event: LogEvent.FILEMANAGER_UPLOAD_FILE_FAILED,
-          Description: `Uploading file failed`,
-          ACSRequesterUserId: getState(StateKey.UserId),
-          TimeStamp: activity.timestamp,
-          ChatThreadId: getState(StateKey.ThreadId),
-          ExceptionDetails: exception
-        });
+        LoggerUtils.logFileManagerUploadFileFailed(getState, activity.timestamp, exception);
         ErrorEventSubscriber.notifyErrorEvent({
           ErrorType: AdapterErrorEventType.EGRESS_ATTACHMENT_UPLOAD_FAILED,
           ErrorMessage: exception.message,
