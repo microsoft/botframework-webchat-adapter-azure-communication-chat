@@ -17,12 +17,7 @@ import {
 } from '../utils/MessageComparison';
 import { ChatEqualityFields, GetStateFunction } from '../types/AdapterTypes';
 import { ChatMessage, ParticipantsAddedEvent, ParticipantsRemovedEvent } from '@azure/communication-chat';
-import {
-  logFileManagerDownloadFileFailed,
-  logProcessingParticipantAddedEvent,
-  logProcessingParticipantRemovedEvent,
-  logUnsupportedMessageType
-} from '../utils/LoggerUtils';
+import { LoggerUtils } from '../utils/LoggerUtils';
 
 /**
  * Returns the users id.
@@ -89,7 +84,7 @@ export const downloadAttachments = async (
 
     return await filemanager.downloadFiles(files);
   } catch (exception) {
-    logFileManagerDownloadFileFailed(exception);
+    LoggerUtils.logFileManagerDownloadFileFailed(exception);
     eventManager.handleError(exception);
   }
 };
@@ -123,7 +118,7 @@ export const downloadAttachmentsDirect = async (
     }
     return await filemanager.downloadFiles(fileData);
   } catch (exception) {
-    logFileManagerDownloadFileFailed(exception);
+    LoggerUtils.logFileManagerDownloadFileFailed(exception);
     eventManager.handleError(exception);
   }
 };
@@ -233,7 +228,7 @@ export const isDuplicateMessage = (
       });
     }
     default:
-      logUnsupportedMessageType(message);
+      LoggerUtils.logUnsupportedMessageType(message);
       return false;
   }
 };
@@ -268,7 +263,7 @@ export const updateMessageCacheWithMessage = (
       break;
     }
     default: {
-      logUnsupportedMessageType(message);
+      LoggerUtils.logUnsupportedMessageType(message);
       break;
     }
   }
@@ -284,7 +279,7 @@ export const cacheParticipantAddedEventIfNeeded = (
     addedParticipants: event.participantsAdded
   });
   if (!isProcessed) {
-    logProcessingParticipantAddedEvent(getState, event);
+    LoggerUtils.logProcessingParticipantAddedEvent(getState, event);
     messageCache.set(key, {
       addedParticipants: event.participantsAdded
     });
@@ -302,7 +297,7 @@ export const cacheParticipantRemovedEventIfNeeded = (
     removedParticipants: event.participantsRemoved
   });
   if (!isProcessed) {
-    logProcessingParticipantRemovedEvent(getState, event);
+    LoggerUtils.logProcessingParticipantRemovedEvent(getState, event);
     messageCache.set(key, {
       removedParticipants: event.participantsRemoved
     });

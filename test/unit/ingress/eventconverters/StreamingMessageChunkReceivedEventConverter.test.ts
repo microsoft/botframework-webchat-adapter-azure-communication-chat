@@ -1,14 +1,13 @@
 import { StreamingChatMessageChunkReceivedEvent } from '@azure/communication-chat';
 import { convertStreamingMessageChunkEvent } from '../../../../src/ingress/eventconverters/StreamingMessageChunkReceivedEventConverter';
 import { createStreamingMessageChunkToDirectLineActivityMapper } from '../../../../src/ingress/mappers/createStreamingMessageChunkToDirectLineActivityMapper';
-import { logConvertStreamingMessageChunkEvent } from '../../../../src/utils/LoggerUtils';
+import { LoggerUtils } from '../../../../src/utils/LoggerUtils';
 import { ACSDirectLineActivity } from '../../../../src/models/ACSDirectLineActivity';
 import { GetStateFunction } from '../../../../src/types/AdapterTypes';
 import { ACSAdapterState } from '../../../../src/models/ACSAdapterState';
 
 // Mock dependencies
 jest.mock('../../../../src/ingress/mappers/createStreamingMessageChunkToDirectLineActivityMapper');
-jest.mock('../../../../src/utils/LoggerUtils');
 
 describe('convertStreamingMessageChunkEvent', () => {
   // Test variables
@@ -20,6 +19,7 @@ describe('convertStreamingMessageChunkEvent', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(LoggerUtils, 'logConvertStreamingMessageChunkEvent').mockImplementation(jest.fn());
     (createStreamingMessageChunkToDirectLineActivityMapper as jest.Mock).mockReturnValue(mockMapper);
   });
 
@@ -34,7 +34,7 @@ describe('convertStreamingMessageChunkEvent', () => {
     });
     expect(mockMapper).toHaveBeenCalled();
     expect(mockMapperAction).toHaveBeenCalledWith(mockEvent);
-    expect(logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
+    expect(LoggerUtils.logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
     expect(result).toEqual(mockActivity);
   });
 
@@ -49,7 +49,7 @@ describe('convertStreamingMessageChunkEvent', () => {
     });
     expect(mockMapper).toHaveBeenCalled();
     expect(mockMapperAction).toHaveBeenCalledWith(mockEvent);
-    expect(logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
+    expect(LoggerUtils.logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
     expect(result).toEqual(mockActivity);
   });
 
@@ -60,6 +60,6 @@ describe('convertStreamingMessageChunkEvent', () => {
     const result = await convertStreamingMessageChunkEvent(mockEvent, mockGetState, existingMessageInCache);
 
     expect(result).toBeUndefined();
-    expect(logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
+    expect(LoggerUtils.logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
   });
 });

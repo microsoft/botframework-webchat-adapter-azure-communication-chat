@@ -5,12 +5,11 @@ import { authConfig } from '../../../src/sdk/Auth';
 import { config } from '../../../src/sdk/Config';
 import { ErrorEventSubscriber } from '../../../src/event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../../src/types/ErrorEventTypes';
-import * as LoggerUtils from '../../../src/utils/LoggerUtils';
+import { LoggerUtils } from '../../../src/utils/LoggerUtils';
 
 jest.mock('@azure/communication-chat');
 jest.mock('@azure/communication-common');
 jest.mock('../../../src/event/ErrorEventNotifier');
-jest.mock('../../../src/utils/LoggerUtils');
 
 describe('SDKInit', () => {
   const mockId = 'mock-id';
@@ -30,6 +29,9 @@ describe('SDKInit', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(LoggerUtils, 'logSDKStartInit').mockImplementation(jest.fn());
+    jest.spyOn(LoggerUtils, 'logSDKStartInitError').mockImplementation(jest.fn());
+    jest.spyOn(LoggerUtils, 'logSDKJoinThreadError').mockImplementation(jest.fn());
 
     (ChatClient as jest.Mock).mockImplementation(() => mockChatClient);
     (AzureCommunicationTokenCredential as jest.Mock).mockImplementation(() => ({}));

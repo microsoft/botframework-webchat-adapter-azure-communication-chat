@@ -42,37 +42,7 @@ import { AdapterErrorEventType } from '../types/ErrorEventTypes';
 import { queueAttachmentDownloading } from '../utils/AttachmentProcessor';
 import { ConnectionStatus } from '../libs/enhancers/exportDLJSInterface';
 import { IMessagePollingHandle } from '../types/MessagePollingTypes';
-import {
-  logStreamingMessageChunkEventAlreadyProcessed,
-  logStreamingMessageChunkEventReceived,
-  logParticipantAddedEventReceived,
-  logAdapterPollingSkipped,
-  logSendPollingRequest,
-  logSkipProcessedPolledMessage,
-  logProcessingPolledMessage,
-  logCachePolledHistoryMessage,
-  logWebChatConnectedEvent,
-  logProcessCachedPagedHistoryMessage,
-  logPollingMessageFetchFailed,
-  logCancellingPollingCallback,
-  logPollingCallbackCreated,
-  logPollingCallStopped,
-  logPollingStatusCode,
-  logCancelPolling,
-  logParticipantAddedEventAlreadyProcessed,
-  logCacheParticipantsAddedEvent,
-  logProcessPolledCachedHistoryMessage,
-  logProcessCachedTextMessage,
-  logProcessCachedParticipantsAddedEvent,
-  logCacheParticipantRemovedEvent,
-  logParticipantRemovedEventReceived,
-  logParticipantRemovedEventAlreadyProcessed,
-  logProcessCachedParticipantsRemovedEvent,
-  logSkipProcessedEditEvent,
-  logMessageEditEventReceived,
-  logMessageDeletedEventReceived,
-  logSkipProcessedDeletedMessageEvent
-} from '../utils/LoggerUtils';
+import { LoggerUtils } from '../utils/LoggerUtils';
 import { convertStreamingMessageChunkEvent } from './eventconverters/StreamingMessageChunkReceivedEventConverter';
 import {
   convertAndProcessHistoryMessageByType,
@@ -186,7 +156,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
       const sendErrorActivity = async (unsubscribed: boolean, next: any, error: Error): Promise<void> => {
         const activity = await convertErrorMessage(error);
-        if (!unsubscribed) { 
+        if (!unsubscribed) {
           next(activity);
         }
       };
@@ -387,22 +357,31 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
                 // Ready state is closed so skip polling.
                 if (getReadyState() === ReadyState.CLOSED) {
-                  logAdapterPollingSkipped(getState, 'ACS Adapter: Polling skipped because of thread deletion.');
+                  LoggerUtils.logAdapterPollingSkipped(
+                    getState,
+                    'ACS Adapter: Polling skipped because of thread deletion.'
+                  );
                   return;
                 }
 
                 try {
                   if (!previousPollingCallTimerFinished) {
-                    logAdapterPollingSkipped(getState, 'ACS Adapter: Polling call issued too soon: skipping');
+                    LoggerUtils.logAdapterPollingSkipped(
+                      getState,
+                      'ACS Adapter: Polling call issued too soon: skipping'
+                    );
                     return;
                   }
 
                   if (!messagePollingInstance?.getIsPollingEnabled()) {
-                    logAdapterPollingSkipped(getState, 'ACS Adapter: Polling call disabled from the client: skipping');
+                    LoggerUtils.logAdapterPollingSkipped(
+                      getState,
+                      'ACS Adapter: Polling call disabled from the client: skipping'
+                    );
                     return;
                   }
 
-                  logSendPollingRequest(getState);
+                  LoggerUtils.logSendPollingRequest(getState);
                   const iterator = chatThreadClient.listMessages({
                     ...telemetryOptions,
                     startTime: startTime,
@@ -420,11 +399,11 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       }
                       const isProcessed = isDuplicateMessage(message, messageCache, fileManager);
                       if (isProcessed) {
-                        logSkipProcessedPolledMessage(getState, message.id);
+                        LoggerUtils.logSkipProcessedPolledMessage(getState, message.id);
                       } else {
-                        logProcessingPolledMessage(getState, message.id);
+                        LoggerUtils.logProcessingPolledMessage(getState, message.id);
                         if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                          logCachePolledHistoryMessage(getState, message.id);
+                          LoggerUtils.logCachePolledHistoryMessage(getState, message.id);
                           polledHistoryMessagesBeforeWebChatInit.push(message);
                           result = await iterator.next();
                           continue;
@@ -447,7 +426,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   }
                 } catch (exception) {
                   pollingException = exception;
-                  logPollingMessageFetchFailed(getState, exception);
+                  LoggerUtils.logPollingMessageFetchFailed(getState, exception);
                   ErrorEventSubscriber.notifyErrorEvent({
                     StatusCode: exception.response?.status,
                     ErrorType: AdapterErrorEventType.MESSAGE_POLLING_FAILED,
@@ -470,7 +449,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   if (!messagePollingInstance?.stopPolling() && (!pollingException || isPollable(statusCode))) {
                     // If there is a poll active, we cancel it and schedule next one after specified timeout.
                     if (pollingCallbackId) {
-                      logCancellingPollingCallback(getState, pollingCallbackId);
+                      LoggerUtils.logCancellingPollingCallback(getState, pollingCallbackId);
                       clearTimeout(pollingCallbackId);
                     }
                     pollingCallbackId = window.setTimeout(
@@ -484,10 +463,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       iteration <= initialPollingOptimizationCount ? 1000 : delaytm
                     );
 
-                    logPollingCallbackCreated(getState, pollingCallbackId);
+                    LoggerUtils.logPollingCallbackCreated(getState, pollingCallbackId);
                   } else {
                     if (messagePollingInstance?.stopPolling()) {
-                      logPollingCallStopped(getState);
+                      LoggerUtils.logPollingCallStopped(getState);
                     }
                     // Status code is not pollable as the thread is deleted or user doesn't have permission any more.
                     setReadyState(ReadyState.CLOSED);
@@ -496,13 +475,13 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               };
 
               const isPollable = (statusCode: number): boolean => {
-                logPollingStatusCode(getState, statusCode);
+                LoggerUtils.logPollingStatusCode(getState, statusCode);
                 return !(statusCode === 401 || statusCode === 403 || statusCode === 404);
               };
 
               const reinitializePolling = async (): Promise<void> => {
                 if (pollingCallbackId) {
-                  logCancelPolling(getState, pollingCallbackId);
+                  LoggerUtils.logCancelPolling(getState, pollingCallbackId);
                   clearTimeout(pollingCallbackId);
                 }
                 await pollForMessages(getState(StateKey.PollingInterval), chatThreadClient);
@@ -591,18 +570,18 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const subscribeWebChatInitCompleted = async (): Promise<void> => {
                 const eventManager: EventManager = getState(StateKey.EventManager);
                 eventManager?.addEventListener('webchat-status-connected', async () => {
-                  logWebChatConnectedEvent();
+                  LoggerUtils.logWebChatConnectedEvent();
                   // Process messages for handling cached paged response messages
                   while (PagedHistoryMessagesBeforeWebChatInit.length > 0) {
                     const historyMessage: ChatMessage = PagedHistoryMessagesBeforeWebChatInit.pop();
-                    logProcessCachedPagedHistoryMessage(getState, historyMessage);
+                    LoggerUtils.logProcessCachedPagedHistoryMessage(getState, historyMessage);
                     const logDescription = 'ACS Adapter: Post activity, paged history message with Id: ';
                     convertAndProcessHistoryMessageByType(historyMessage, getState, next, logDescription);
                   }
                   // Process messages for handling cached polled response messages
                   while (polledHistoryMessagesBeforeWebChatInit.length > 0) {
                     const historyMessage: ChatMessage = polledHistoryMessagesBeforeWebChatInit.pop();
-                    logProcessPolledCachedHistoryMessage(getState, historyMessage);
+                    LoggerUtils.logProcessPolledCachedHistoryMessage(getState, historyMessage);
                     updateMessageCacheWithMessage(historyMessage, messageCache, fileManager);
 
                     const logDescription = 'ACS Adapter: Post activity, history messageId: ' + historyMessage.id;
@@ -613,7 +592,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   while (newMessagesBeforeWebChatInit.length > 0) {
                     const pendingMessageEvent = newMessagesBeforeWebChatInit.pop();
                     if (isParticipantsAddedEvent(pendingMessageEvent)) {
-                      logProcessCachedParticipantsAddedEvent(pendingMessageEvent);
+                      LoggerUtils.logProcessCachedParticipantsAddedEvent(pendingMessageEvent);
                       processParticipants(
                         pendingMessageEvent.participantsAdded,
                         Constants.PARTICIPANT_JOINED,
@@ -621,7 +600,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                         next
                       );
                     } else if (isParticipantsRemovedEvent(pendingMessageEvent)) {
-                      logProcessCachedParticipantsRemovedEvent(pendingMessageEvent);
+                      LoggerUtils.logProcessCachedParticipantsRemovedEvent(pendingMessageEvent);
                       processParticipants(
                         pendingMessageEvent.participantsRemoved,
                         Constants.PARTICIPANT_LEFT,
@@ -629,7 +608,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                         next
                       );
                     } else if ('message' in pendingMessageEvent) {
-                      logProcessCachedTextMessage(pendingMessageEvent);
+                      LoggerUtils.logProcessCachedTextMessage(pendingMessageEvent);
                       await onMessageReceived(pendingMessageEvent);
                     }
                   }
@@ -710,7 +689,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
               const onMessageDeleted = async (event: ChatMessageDeletedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  logMessageDeletedEventReceived(event);
+                  LoggerUtils.logMessageDeletedEventReceived(event);
 
                   const messageToCheck = { ...event, message: '' };
                   const isProcessed = cacheTextMessageIfNeeded(
@@ -721,7 +700,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     LogEvent.ACS_PROCESSING_DELETED_MESSAGE
                   );
                   if (isProcessed) {
-                    logSkipProcessedDeletedMessageEvent(event, getState);
+                    LoggerUtils.logSkipProcessedDeletedMessageEvent(event, getState);
                     return;
                   }
 
@@ -734,7 +713,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
               const onMessageEdited = async (event: ChatMessageEditedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  logMessageEditEventReceived(event);
+                  LoggerUtils.logMessageEditEventReceived(event);
 
                   if (!fileManager) {
                     fileManager = getState(StateKey.FileManager);
@@ -747,7 +726,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     LogEvent.ACS_PROCESSING_EDITED_MESSAGE
                   );
                   if (isProcessed) {
-                    logSkipProcessedEditEvent(event, getState);
+                    LoggerUtils.logSkipProcessedEditEvent(event, getState);
                     return;
                   }
 
@@ -762,7 +741,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 event: StreamingChatMessageChunkReceivedEvent
               ): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
-                  logStreamingMessageChunkEventReceived(event);
+                  LoggerUtils.logStreamingMessageChunkEventReceived(event);
 
                   if (!fileManager) {
                     fileManager = getState(StateKey.FileManager);
@@ -778,7 +757,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                   );
 
                   if (isProcessed) {
-                    logStreamingMessageChunkEventAlreadyProcessed(event);
+                    LoggerUtils.logStreamingMessageChunkEventAlreadyProcessed(event);
                     return;
                   }
 
@@ -796,15 +775,15 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const onParticipantsAdded = async (event: ParticipantsAddedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
                   if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                    logCacheParticipantsAddedEvent(event);
+                    LoggerUtils.logCacheParticipantsAddedEvent(event);
                     newMessagesBeforeWebChatInit.push(event);
                     return;
                   }
-                  logParticipantAddedEventReceived(event);
+                  LoggerUtils.logParticipantAddedEventReceived(event);
 
                   const isProcessed = cacheParticipantAddedEventIfNeeded(messageCache, event, getState);
                   if (isProcessed) {
-                    logParticipantAddedEventAlreadyProcessed(getState, event);
+                    LoggerUtils.logParticipantAddedEventAlreadyProcessed(getState, event);
                     return;
                   }
                   processParticipants(event.participantsAdded, Constants.PARTICIPANT_JOINED, getState, next);
@@ -814,15 +793,15 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const onParticipantsRemoved = async (event: ParticipantsRemovedEvent): Promise<void> => {
                 if (event.threadId === getState(StateKey.ThreadId)) {
                   if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-                    logCacheParticipantRemovedEvent(event);
+                    LoggerUtils.logCacheParticipantRemovedEvent(event);
                     newMessagesBeforeWebChatInit.push(event);
                     return;
                   }
 
-                  logParticipantRemovedEventReceived(event);
+                  LoggerUtils.logParticipantRemovedEventReceived(event);
                   const isProcessed = cacheParticipantRemovedEventIfNeeded(messageCache, event, getState);
                   if (isProcessed) {
-                    logParticipantRemovedEventAlreadyProcessed(getState, event);
+                    LoggerUtils.logParticipantRemovedEventAlreadyProcessed(getState, event);
                     return;
                   }
 

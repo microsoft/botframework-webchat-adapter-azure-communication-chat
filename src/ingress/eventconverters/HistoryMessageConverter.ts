@@ -1,10 +1,6 @@
 import { ChatMessage } from '@azure/communication-chat';
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
-import {
-  logAdapterPostActivity,
-  logCachedPagedHistoryMessage,
-  logConvertHistoryTextMessage
-} from '../../utils/LoggerUtils';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 import { ACSAdapterState, StateKey } from '../../models/ACSAdapterState';
 import { GetStateFunction } from '../../types/AdapterTypes';
 import { ConnectionStatus } from '../../libs/enhancers/exportDLJSInterface';
@@ -27,7 +23,7 @@ export const processHistoryMessage = async (
   }
   // Handle disconnected state
   if (getState(StateKey.WebChatStatus) !== ConnectionStatus.Connected) {
-    logCachedPagedHistoryMessage(logDescription, message, getState);
+    LoggerUtils.logCachedPagedHistoryMessage(logDescription, message, getState);
     pagedHistoryMessagesBeforeWebChatInit.push(message);
     return true;
   }
@@ -94,7 +90,7 @@ const updateHistoryActivityFromFieldIfActivityValid = (
   logDescription: string
 ): void => {
   if (activity) {
-    logAdapterPostActivity(getState, logDescription + activity.messageid, message);
+    LoggerUtils.logAdapterPostActivity(getState, logDescription + activity.messageid, message);
 
     // Properly set the fromList property with correct typing
     if (!activity.channelData) {
@@ -111,6 +107,6 @@ const convertHistoryTextMessage = async (
   getState: GetStateFunction<ACSAdapterState>
 ): Promise<void | ACSDirectLineActivity> => {
   const activity = await createHistoryMessageToDirectLineActivityMapper({ getState })()(message);
-  logConvertHistoryTextMessage(message);
+  LoggerUtils.logConvertHistoryTextMessage(message);
   return activity;
 };

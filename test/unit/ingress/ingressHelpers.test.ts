@@ -4,7 +4,7 @@ import { ACSAdapterState, StateKey } from '../../../src/models/ACSAdapterState';
 import { ChatEqualityFields, GetStateFunction } from '../../../src/types/AdapterTypes';
 import { IFileManager } from '../../../src/types/FileManagerTypes';
 import * as MessageComparison from '../../../src/utils/MessageComparison';
-import * as LoggerUtils from '../../../src/utils/LoggerUtils';
+import { LoggerUtils } from '../../../src/utils/LoggerUtils';
 import { ChatMessage, ParticipantsAddedEvent, ParticipantsRemovedEvent } from '@azure/communication-chat';
 
 import {
@@ -27,7 +27,6 @@ import {
 // Mock dependencies
 jest.mock('../../../src/log/Logger');
 jest.mock('../../../src/utils/MessageComparison');
-jest.mock('../../../src/utils/LoggerUtils');
 
 describe('ingressHelpers', () => {
   // Common test variables
@@ -38,6 +37,11 @@ describe('ingressHelpers', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
+
+    // Mock all LoggerUtils static methods
+    jest.spyOn(LoggerUtils, 'logUnsupportedMessageType').mockImplementation(jest.fn());
+    jest.spyOn(LoggerUtils, 'logProcessingParticipantAddedEvent').mockImplementation(jest.fn());
+    jest.spyOn(LoggerUtils, 'logProcessingParticipantRemovedEvent').mockImplementation(jest.fn());
 
     // Setup common test variables
     messageCache = new Map();
