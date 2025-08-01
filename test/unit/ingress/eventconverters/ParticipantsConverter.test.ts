@@ -4,7 +4,6 @@ import { ACSAdapterState } from '../../../../src/models/ACSAdapterState';
 import { ACSDirectLineActivity } from '../../../../src/models/ACSDirectLineActivity';
 import { getIdFromIdentifier } from '../../../../src/ingress/ingressHelpers';
 import createThreadUpdateToDirectLineActivityMapper from '../../../../src/ingress/mappers/createThreadUpdateToDirectLineActivityMapper';
-import { LoggerUtils } from '../../../../src/utils/LoggerUtils';
 import {
   processParticipants,
   convertThreadUpdate
@@ -26,7 +25,6 @@ describe('ParticipantsConverter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(LoggerUtils, 'logConvertThreadUpdateEvent').mockImplementation(jest.fn());
 
     mockGetState = jest.fn() as unknown as GetStateFunction<ACSAdapterState>;
     mockNext = jest.fn();
@@ -62,7 +60,6 @@ describe('ParticipantsConverter', () => {
       tag: Constants.PARTICIPANT_JOINED,
       id: 'user1'
     });
-    expect(LoggerUtils.logConvertThreadUpdateEvent).toHaveBeenCalled();
     expect(result).toBe(mockActivity);
   });
 

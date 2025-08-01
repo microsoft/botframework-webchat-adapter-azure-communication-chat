@@ -1,7 +1,6 @@
 import { StreamingChatMessageChunkReceivedEvent } from '@azure/communication-chat';
 import { convertStreamingMessageChunkEvent } from '../../../../src/ingress/eventconverters/StreamingMessageChunkReceivedEventConverter';
 import { createStreamingMessageChunkToDirectLineActivityMapper } from '../../../../src/ingress/mappers/createStreamingMessageChunkToDirectLineActivityMapper';
-import { LoggerUtils } from '../../../../src/utils/LoggerUtils';
 import { ACSDirectLineActivity } from '../../../../src/models/ACSDirectLineActivity';
 import { GetStateFunction } from '../../../../src/types/AdapterTypes';
 import { ACSAdapterState } from '../../../../src/models/ACSAdapterState';
@@ -11,7 +10,19 @@ jest.mock('../../../../src/ingress/mappers/createStreamingMessageChunkToDirectLi
 
 describe('convertStreamingMessageChunkEvent', () => {
   // Test variables
-  const mockEvent = { id: 'test-id' } as unknown as StreamingChatMessageChunkReceivedEvent;
+  const mockEvent: StreamingChatMessageChunkReceivedEvent = {
+    id: 'test-id',
+    sender: { communicationUserId: 'user-id2', kind: 'communicationUser' },
+    editedOn: new Date(),
+    message: 'Test',
+    version: '1',
+    type: 'test',
+    threadId: 'testThreadId',
+    senderDisplayName: 'SenderName',
+    recipient: { communicationUserId: 'user-id', kind: 'communicationUser' },
+    metadata: {},
+    createdOn: new Date()
+  };
   const mockGetState = jest.fn() as GetStateFunction<ACSAdapterState>;
   const mockActivity = { type: 'message' } as unknown as ACSDirectLineActivity;
   const mockMapperAction = jest.fn().mockResolvedValue(mockActivity);
@@ -19,7 +30,6 @@ describe('convertStreamingMessageChunkEvent', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(LoggerUtils, 'logConvertStreamingMessageChunkEvent').mockImplementation(jest.fn());
     (createStreamingMessageChunkToDirectLineActivityMapper as jest.Mock).mockReturnValue(mockMapper);
   });
 
@@ -34,7 +44,6 @@ describe('convertStreamingMessageChunkEvent', () => {
     });
     expect(mockMapper).toHaveBeenCalled();
     expect(mockMapperAction).toHaveBeenCalledWith(mockEvent);
-    expect(LoggerUtils.logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
     expect(result).toEqual(mockActivity);
   });
 
@@ -49,7 +58,6 @@ describe('convertStreamingMessageChunkEvent', () => {
     });
     expect(mockMapper).toHaveBeenCalled();
     expect(mockMapperAction).toHaveBeenCalledWith(mockEvent);
-    expect(LoggerUtils.logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
     expect(result).toEqual(mockActivity);
   });
 
@@ -60,6 +68,5 @@ describe('convertStreamingMessageChunkEvent', () => {
     const result = await convertStreamingMessageChunkEvent(mockEvent, mockGetState, existingMessageInCache);
 
     expect(result).toBeUndefined();
-    expect(LoggerUtils.logConvertStreamingMessageChunkEvent).toHaveBeenCalledWith(mockEvent);
   });
 });

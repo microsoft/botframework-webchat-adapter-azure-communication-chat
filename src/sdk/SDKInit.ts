@@ -5,6 +5,7 @@ import { config } from './Config';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../types/ErrorEventTypes';
 import { LoggerUtils } from '../utils/LoggerUtils';
+import { LogEvent } from '../types/LogTypes';
 
 export const SDKInit = async (
   token: string,
@@ -56,7 +57,7 @@ export const SDKInit = async (
     SDK.chatThreadClient = SDK.chatClient.getChatThreadClient(threadId);
 
     if (!SDK.chatThreadClient) {
-      LoggerUtils.logSDKJoinThreadError();
+      LoggerUtils.logSimpleErrorEvent(LogEvent.ACS_SDK_JOINTHREAD_ERROR, `ACS Adapter: failed to join the thread.`);
     }
 
     await SDK.chatClient.startRealtimeNotifications();

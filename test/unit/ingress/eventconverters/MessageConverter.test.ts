@@ -8,7 +8,6 @@ import createDeletedMessageEventToDirectLineActivityMapper from '../../../../src
 import { ACSDirectLineActivity } from '../../../../src/models/ACSDirectLineActivity';
 import { GetStateFunction } from '../../../../src/types';
 import { ACSAdapterState } from '../../../../src';
-import { LoggerUtils } from '../../../../src/utils/LoggerUtils';
 
 // Mock dependencies
 jest.mock('../../../../src/ingress/mappers/createEditedMessageToDirectLineActivityMapper');
@@ -21,10 +20,6 @@ describe('MessageConverter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(LoggerUtils, 'logConvertEditedMessageEvent').mockImplementation(jest.fn());
-    jest.spyOn(LoggerUtils, 'logEditEventIngressFailed').mockImplementation(jest.fn());
-    jest.spyOn(LoggerUtils, 'logConvertDeletedMessageEvent').mockImplementation(jest.fn());
-    jest.spyOn(LoggerUtils, 'logDeletedMessageEventIngressFailed').mockImplementation(jest.fn());
   });
 
   describe('convertEditedMessageEvent', () => {
@@ -52,7 +47,6 @@ describe('MessageConverter', () => {
       expect(createEditedMessageToDirectLineActivityMapper).toHaveBeenCalledWith({ getState: mockGetState });
       expect(middleFn).toHaveBeenCalled();
       expect(innerFn).toHaveBeenCalledWith(mockEditedEvent);
-      expect(LoggerUtils.logConvertEditedMessageEvent).toHaveBeenCalledWith(mockEditedEvent);
       expect(result).toBe(mockActivity);
     });
 
@@ -67,7 +61,6 @@ describe('MessageConverter', () => {
 
       const result = await convertEditedMessageEvent(mockEditedEvent, mockGetState);
 
-      expect(LoggerUtils.logEditEventIngressFailed).toHaveBeenCalledWith(mockEditedEvent, errorMessage, mockGetState);
       expect(result).toBeUndefined();
     });
   });
@@ -95,7 +88,6 @@ describe('MessageConverter', () => {
       expect(createDeletedMessageEventToDirectLineActivityMapper).toHaveBeenCalledWith({ getState: mockGetState });
       expect(middleFn).toHaveBeenCalled();
       expect(innerFn).toHaveBeenCalledWith(mockDeletedEvent);
-      expect(LoggerUtils.logConvertDeletedMessageEvent).toHaveBeenCalledWith(mockDeletedEvent);
       expect(result).toBe(mockActivity);
     });
 
@@ -110,11 +102,6 @@ describe('MessageConverter', () => {
 
       const result = await convertDeletedMessageEvent(mockDeletedEvent, mockGetState);
 
-      expect(LoggerUtils.logDeletedMessageEventIngressFailed).toHaveBeenCalledWith(
-        mockDeletedEvent,
-        errorMessage,
-        mockGetState
-      );
       expect(result).toBeUndefined();
     });
   });

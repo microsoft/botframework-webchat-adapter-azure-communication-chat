@@ -15,6 +15,7 @@ import ConnectivityManager from './utils/ConnectivityManager';
 import { ErrorEventSubscriber, IErrorEventSubscriber } from './event/ErrorEventNotifier';
 import { MessagePollingHandle } from './types/MessagePollingTypes';
 import { LoggerUtils } from './utils/LoggerUtils';
+import { LogEvent } from './types';
 
 export default function createACSStoreEnhancer(
   token: string,
@@ -78,7 +79,7 @@ export default function createACSStoreEnhancer(
           }
           adapter.setReadyState(ReadyState.OPEN);
 
-          LoggerUtils.logACSSDKReconnect();
+          LoggerUtils.logSimpleInfoEvent(LogEvent.ACS_SDK_RECONNECT, `ACS Adapter: Reconnect to network.`);
         });
         eventManager.addEventListener('offline', () => {
           adapter.setReadyState(ReadyState.CONNECTING);

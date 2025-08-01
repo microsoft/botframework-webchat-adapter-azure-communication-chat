@@ -22,6 +22,29 @@ import { ACSDirectLineActivity } from '../models/ACSDirectLineActivity';
 import { ProcessChatMessageEventProps } from '../ingress/ingressHelpers';
 
 export class LoggerUtils {
+  static logSimpleInfoEvent = (event: LogEvent, description: string): void => {
+    Logger.logEvent(LogLevel.INFO, {
+      Event: event,
+      Description: description
+    });
+  };
+
+  static logSimpleErrorEvent = (event: LogEvent, description: string, exception?: Error): void => {
+    Logger.logEvent(LogLevel.ERROR, {
+      Event: event,
+      Description: description,
+      ...(exception ? { ExceptionDetails: exception } : {})
+    });
+  };
+
+  static logSimpleDebugEvent = (event: LogEvent, description: string): void => {
+    Logger.logEvent(LogLevel.DEBUG, {
+      Event: event,
+      Description: description,
+      TimeStamp: new Date().toISOString()
+    });
+  };
+
   static logConvertStreamingMessageChunkEvent = (event: StreamingChatMessageChunkReceivedEvent): void => {
     Logger.logEvent(LogLevel.INFO, {
       Event: LogEvent.ACS_ADAPTER_CONVERT_STREAMING_CHAT_MESSAGE_CHUNK,
@@ -95,20 +118,6 @@ export class LoggerUtils {
       UserRemoved: event.participantsRemoved.map(
         (p: ChatParticipant) => (p.id as CommunicationUserIdentifier).communicationUserId
       )
-    });
-  };
-
-  static logSimpleInfoEvent = (event: LogEvent, description: string): void => {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: event,
-      Description: description
-    });
-  };
-
-  static logConvertThreadUpdateEvent = (): void => {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.ACS_ADAPTER_CONVERT_THREAD_UPDATED,
-      Description: 'ACS Adapter: convert thread update'
     });
   };
 
@@ -244,13 +253,6 @@ export class LoggerUtils {
       TimeStamp: message.createdOn.toISOString(),
       ChatMessageId: message.id,
       ACSRequesterUserId: getState(StateKey.UserId)
-    });
-  };
-
-  static logWebChatConnectedEvent = (): void => {
-    Logger.logEvent(LogLevel.DEBUG, {
-      Event: LogEvent.WEBCHAT_STATUS_CONNECTED,
-      Description: `ACS Adapter: Event Webchat connected received`
     });
   };
 
@@ -417,11 +419,10 @@ export class LoggerUtils {
   };
 
   static logUnsupportedMessageType = (message: ChatMessage): void => {
-    Logger.logEvent(LogLevel.DEBUG, {
-      Event: LogEvent.UNSUPPORTED_MESSAGE_TYPE,
-      Description: `Message with ${message.id} has unsupported message type: ${message.type}`,
-      TimeStamp: new Date().toISOString()
-    });
+    this.logSimpleDebugEvent(
+      LogEvent.UNSUPPORTED_MESSAGE_TYPE,
+      `Message with ${message.id} has unsupported message type: ${message.type}`
+    );
   };
 
   static logEditEventIngressFailed = (
@@ -565,11 +566,11 @@ export class LoggerUtils {
   };
 
   static logFileManagerDownloadFileFailed = (exception: Error): void => {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.FILEMANAGER_DOWNLOAD_FILE_FAILED,
-      Description: `Downloading attachment for message failed.`,
-      ExceptionDetails: exception
-    });
+    this.logSimpleErrorEvent(
+      LogEvent.FILEMANAGER_DOWNLOAD_FILE_FAILED,
+      `Downloading attachment for message failed.`,
+      exception
+    );
   };
 
   static logSDKStartInitError = (
@@ -593,20 +594,6 @@ export class LoggerUtils {
       ChatThreadId: threadId,
       ACSRequesterUserId: requesterUserId,
       Description: `ACS Adapter: ACS Adapter start init.`
-    });
-  };
-
-  static logSDKJoinThreadError = (): void => {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.ACS_SDK_JOINTHREAD_ERROR,
-      Description: `ACS Adapter: failed to join the thread.`
-    });
-  };
-
-  static logACSSDKReconnect = (): void => {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.ACS_SDK_RECONNECT,
-      Description: `ACS Adapter: Reconnect to network.`
     });
   };
 
@@ -787,11 +774,7 @@ export class LoggerUtils {
   };
 
   static logACSReconnectError = (description: string, exception?: Error): void => {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.ACS_SDK_CHATCLIENT_RECONNECT_ERROR,
-      Description: description,
-      ...(exception ? { ExceptionDetails: exception } : {})
-    });
+    this.logSimpleErrorEvent(LogEvent.ACS_SDK_CHATCLIENT_RECONNECT_ERROR, description, exception);
   };
 
   static logHistoryMessageIngressFailed = (
@@ -944,27 +927,6 @@ export class LoggerUtils {
     });
   };
 
-  static logAdapterStateUpdate = (description: string): void => {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.ADAPTER_STATE_UPDATE,
-      Description: description
-    });
-  };
-
-  static logWebChatSubscriptionSuccess = (description: string): void => {
-    Logger.logEvent(LogLevel.INFO, {
-      Event: LogEvent.WEBCHAT_SUBSCRIPTION_SUCCESS,
-      Description: description
-    });
-  };
-
-  static logWebChatSubscriptionTimeout = (description: string): void => {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.WEBCHAT_SUBSCRIPTION_TIMEOUT,
-      Description: description
-    });
-  };
-
   static logTypingMessageIngressFailed = (
     getState: GetStateFunction<ACSAdapterState>,
     message: TypingIndicatorReceivedEvent,
@@ -977,14 +939,6 @@ export class LoggerUtils {
       MessageSender: (message.sender as CommunicationUserIdentifier).communicationUserId,
       TimeStamp: message.receivedOn.toISOString(),
       ChatThreadId: message.threadId
-    });
-  };
-
-  static logSDKChatClientError = (error: Error): void => {
-    Logger.logEvent(LogLevel.ERROR, {
-      Event: LogEvent.ACS_SDK_CHATCLIENT_ERROR,
-      Description: 'ACS Adapter: convert error message',
-      ExceptionDetails: error.message
     });
   };
 
@@ -1008,14 +962,6 @@ export class LoggerUtils {
     });
   };
 
-  static logNetworkOnline = (disconnectDateTime: Date): void => {
-    Logger.logEvent(LogLevel.DEBUG, {
-      Event: LogEvent.NETWORK_ONLINE,
-      Description: `ACS Adapter: ACS Chat reconnected event since disconnect at ${disconnectDateTime}`,
-      TimeStamp: new Date().toISOString()
-    });
-  };
-
   static logCancelPollingCallback = (getState: GetStateFunction<ACSAdapterState>, description: string): void => {
     Logger.logEvent(LogLevel.INFO, {
       Event: LogEvent.ACS_CANCEL_POLLING_CALLBACK,
@@ -1023,14 +969,6 @@ export class LoggerUtils {
       TimeStamp: new Date().toISOString(),
       ChatThreadId: getState(StateKey.ThreadId),
       ACSRequesterUserId: getState(StateKey.UserId)
-    });
-  };
-
-  static logRTNStateChanged = (event: LogEvent, description: string): void => {
-    Logger.logEvent(LogLevel.DEBUG, {
-      Event: event,
-      Description: description,
-      TimeStamp: new Date().toISOString()
     });
   };
 
@@ -1108,9 +1046,6 @@ export class LoggerUtils {
   };
 
   static logRegisterToEvent = (event: LogEvent, eventDescription: string): void => {
-    Logger.logEvent(LogLevel.DEBUG, {
-      Event: event,
-      Description: `ACS Adapter: Registering on ${eventDescription}`
-    });
+    this.logSimpleDebugEvent(event, `ACS Adapter: Registering on ${eventDescription}`);
   };
 }

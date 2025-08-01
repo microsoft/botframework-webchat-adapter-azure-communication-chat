@@ -98,7 +98,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
 
       const convertErrorMessage = async (error: Error): Promise<void | ACSDirectLineActivity> => {
         const activity = await createErrorMessageToDirectLineActivityMapper({ getState })()(error);
-        LoggerUtils.logSDKChatClientError(error);
+        LoggerUtils.logSimpleErrorEvent(LogEvent.ACS_SDK_CHATCLIENT_ERROR, 'ACS Adapter: convert error message', error);
         return activity;
       };
 
@@ -463,7 +463,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 const eventManager: EventManager = getState(StateKey.EventManager);
                 eventManager?.addEventListener('online', async () => {
                   const disconnectDateTime: Date = getState(StateKey.DisconnectUTC);
-                  LoggerUtils.logNetworkOnline(disconnectDateTime);
+                  LoggerUtils.logSimpleDebugEvent(
+                    LogEvent.NETWORK_ONLINE,
+                    `ACS Adapter: ACS Chat reconnected event since disconnect at ${disconnectDateTime}`
+                  );
                   if (disconnectDateTime) {
                     setState(StateKey.DisconnectUTC, undefined);
                     if (pollingCallbackId) {
@@ -482,7 +485,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               };
 
               const onRealtimeNotificationConnected = async (): Promise<void> => {
-                LoggerUtils.logRTNStateChanged(
+                LoggerUtils.logSimpleDebugEvent(
                   LogEvent.ACS_ADAPTER_REALTIME_NOTIFICATION_CONNECTED,
                   `ACS Adapter: Realtime notification connected`
                 );
@@ -490,7 +493,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               };
 
               const onRealtimeNotificationDisconnected = async (): Promise<void> => {
-                LoggerUtils.logRTNStateChanged(
+                LoggerUtils.logSimpleDebugEvent(
                   LogEvent.ACS_ADAPTER_REALTIME_NOTIFICATION_DISCONNECTED,
                   `ACS Adapter: Realtime notification disconnected`
                 );
@@ -520,7 +523,10 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
               const subscribeWebChatInitCompleted = async (): Promise<void> => {
                 const eventManager: EventManager = getState(StateKey.EventManager);
                 eventManager?.addEventListener('webchat-status-connected', async () => {
-                  LoggerUtils.logWebChatConnectedEvent();
+                  LoggerUtils.logSimpleDebugEvent(
+                    LogEvent.WEBCHAT_STATUS_CONNECTED,
+                    `ACS Adapter: Event Webchat connected received`
+                  );
                   // Process messages for handling cached paged response messages
                   while (PagedHistoryMessagesBeforeWebChatInit.length > 0) {
                     const historyMessage: ChatMessage = PagedHistoryMessagesBeforeWebChatInit.pop();
