@@ -11,7 +11,7 @@ import { getClientId } from './ClientIdToMessageId';
 import uniqueId from './uniqueId';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../types/ErrorEventTypes';
-import { logConvertFetchedMessageFailed } from './LoggerUtils';
+import { LoggerUtils } from './LoggerUtils';
 
 export interface ChatEventMessage {
   messageId: string;
@@ -66,7 +66,7 @@ export async function convertMessageToActivity(
       textData = acsMessageObject?.text;
     } catch (exception) {
       const errorMessage = 'Valid JSON object is expected.';
-      logConvertFetchedMessageFailed(eventMessage, errorMessage, exception);
+      LoggerUtils.logConvertFetchedMessageFailed(eventMessage, errorMessage, exception);
       ErrorEventSubscriber.notifyErrorEvent({
         ErrorType: AdapterErrorEventType.INGRESS_MESSAGE_INVALID_JSON,
         ErrorMessage: exception.message,

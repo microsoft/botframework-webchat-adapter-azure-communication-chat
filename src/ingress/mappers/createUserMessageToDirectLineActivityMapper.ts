@@ -1,7 +1,6 @@
 import { ACSAdapterState, StateKey } from '../../models/ACSAdapterState';
 import { ChatClient, ChatMessageReceivedEvent } from '@azure/communication-chat';
 import { CommunicationUserIdentifier } from '@azure/communication-common';
-import { LogLevel, Logger } from '../../log/Logger';
 import { downloadAttachments } from '../ingressHelpers';
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
 import { AdapterOptions } from '../../types/AdapterTypes';
@@ -9,10 +8,10 @@ import { AsyncMapper } from '../../types/AsyncMapper';
 import EventManager from '../../utils/EventManager';
 import { GetStateFunction } from '../../types/AdapterTypes';
 import { IFileManager } from '../../types/FileManagerTypes';
-import { LogEvent } from '../../types/LogTypes';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
 import { ChatEventMessage, convertMessageToActivity } from '../../utils/ConvertMessageUtils';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 
 export default function createUserMessageToDirectLineActivityMapper({
   getState
@@ -28,15 +27,7 @@ export default function createUserMessageToDirectLineActivityMapper({
 
     if (!chatClient) {
       const errorMessage = 'ACS Adapter: Failed to ingress message without an active chatClient.';
-      Logger.logEvent(LogLevel.ERROR, {
-        Event: LogEvent.ACS_ADAPTER_INGRESS_FAILED,
-        Description: errorMessage,
-        ACSRequesterUserId: getState(StateKey.UserId),
-        MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-        TimeStamp: event.createdOn.toISOString(),
-        ChatThreadId: event.threadId,
-        ChatMessageId: event.id
-      });
+      LoggerUtils.logUserMessageIngressFailed(getState, event, errorMessage);
       throw new Error(errorMessage);
     }
 
@@ -48,15 +39,7 @@ export default function createUserMessageToDirectLineActivityMapper({
       metadata = event.metadata;
       let fileIds: string[];
       try {
-        Logger.logEvent(LogLevel.INFO, {
-          Event: LogEvent.ACS_ADAPTER_REQUEST_DOWNLOAD_ATTACHMENTS,
-          Description: 'Preparing to download attachments',
-          ACSRequesterUserId: getState(StateKey.UserId),
-          MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: event.createdOn.toISOString(),
-          ChatThreadId: event.threadId,
-          ChatMessageId: event.id
-        });
+        LoggerUtils.logRequestDownloadAttachments(getState, event);
         // Retrieve file ids and metadata to download attachments
         fileIds = filemanager.getFileIds(event.metadata);
         const fileMetadata = filemanager.getFileMetadata(event.metadata);
@@ -64,16 +47,7 @@ export default function createUserMessageToDirectLineActivityMapper({
           files = await downloadAttachments(fileIds, fileMetadata, filemanager, eventManager);
         }
       } catch (exception) {
-        Logger.logEvent(LogLevel.ERROR, {
-          Event: LogEvent.ACS_ADAPTER_CONVERT_HISTORY,
-          Description: 'Failed to download attachments',
-          ACSRequesterUserId: getState(StateKey.UserId),
-          MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: event.createdOn.toISOString(),
-          ChatThreadId: event.threadId,
-          ChatMessageId: event.id,
-          ExceptionDetails: exception
-        });
+        LoggerUtils.logDownloadAttachmentsFailed(getState, event, exception);
         ErrorEventSubscriber.notifyErrorEvent({
           ErrorType: AdapterErrorEventType.NEW_MESSAGE_DOWNLOAD_ATTACHMENT_FAILED,
           ErrorMessage: exception.message,

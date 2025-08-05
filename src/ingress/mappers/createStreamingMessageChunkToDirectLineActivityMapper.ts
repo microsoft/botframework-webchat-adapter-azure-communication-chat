@@ -18,6 +18,7 @@ import uniqueId from '../../utils/uniqueId';
 import EventManager from '../../utils/EventManager';
 import { ErrorEventSubscriber } from '../../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../../types/ErrorEventTypes';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 
 export const createStreamingMessageChunkToDirectLineActivityMapper = ({
   getState,
@@ -72,16 +73,7 @@ export const createStreamingMessageChunkToDirectLineActivityMapper = ({
           attachmentSizes = getAttachmentSizes(files);
         }
       } catch (exception) {
-        Logger.logEvent(LogLevel.ERROR, {
-          Event: LogEvent.ACS_PROCESSING_STREAMING_CHAT_MESSAGE_CHUNK,
-          Description: 'Failed to parse StreamingChatMessageChunk metadata',
-          ACSRequesterUserId: getState(StateKey.UserId),
-          MessageSender: (event.sender as CommunicationUserIdentifier).communicationUserId,
-          TimeStamp: event.editedOn.toISOString(),
-          ChatThreadId: event.threadId,
-          ChatMessageId: event.id,
-          ExceptionDetails: exception
-        });
+        LoggerUtils.logProcessingStreamingChatMessageChunkError(event, getState, exception);
         ErrorEventSubscriber.notifyErrorEvent({
           ErrorType: AdapterErrorEventType.MESSAGE_STREAMING_CHUNK_ATTACHMENT_DOWNLOAD_FAILED,
           ErrorMessage: exception.message,

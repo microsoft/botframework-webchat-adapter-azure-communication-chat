@@ -1,10 +1,9 @@
 import { ChatClient, ChatThreadClient } from '@azure/communication-chat';
-import { Logger, LogLevel } from '../log/Logger';
-import { LogEvent } from '../types/LogTypes';
 import { delay } from './MessageComparison';
 import packageInfo from '../../package.json';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../types/ErrorEventTypes';
+import { LoggerUtils } from '../utils/LoggerUtils';
 
 const telemetryOptions = {
   requestOptions: {
@@ -25,10 +24,7 @@ export default class ConnectivityManager {
     while (retryCount < maxRetries) {
       try {
         if (!chatThreadClient || !chatClient) {
-          Logger.logEvent(LogLevel.ERROR, {
-            Event: LogEvent.ACS_SDK_CHATCLIENT_RECONNECT_ERROR,
-            Description: `Trying to reconnect failed as ACS Client is in uninitialized state`
-          });
+          LoggerUtils.logACSReconnectError(`Trying to reconnect failed as ACS Client is in uninitialized state`);
           return false;
         }
 
@@ -39,12 +35,10 @@ export default class ConnectivityManager {
         retryCount++;
         const statusCode = exception?.response?.status;
         if (retryCount >= maxRetries || (!!statusCode && this.isNotRetryable(statusCode))) {
-          Logger.logEvent(LogLevel.ERROR, {
-            Event: LogEvent.ACS_SDK_CHATCLIENT_RECONNECT_ERROR,
-            Description: `Trying to reconnect failed with status ${statusCode} after retries ${retryCount}`,
-            ExceptionDetails: exception
-          });
-
+          LoggerUtils.logACSReconnectError(
+            `Trying to reconnect failed with status ${statusCode} after retries ${retryCount}`,
+            exception
+          );
           ErrorEventSubscriber.notifyErrorEvent({
             StatusCode: exception?.response?.status,
             ErrorType: AdapterErrorEventType.ADAPTER_RECONNECT_FAILED,

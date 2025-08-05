@@ -3,7 +3,7 @@ import { GetStateFunction } from '../../types/AdapterTypes';
 import { ACSAdapterState } from '../../models/ACSAdapterState';
 import { ACSDirectLineActivity } from '../../models/ACSDirectLineActivity';
 import { createStreamingMessageChunkToDirectLineActivityMapper } from '../mappers/createStreamingMessageChunkToDirectLineActivityMapper';
-import { logConvertStreamingMessageChunkEvent, logIngressStreamingChunkFailed } from '../../utils/LoggerUtils';
+import { LoggerUtils } from '../../utils/LoggerUtils';
 
 /**
  * Converts a `StreamingChatMessageChunkReceivedEvent` into an `ACSDirectLineActivity`.
@@ -30,9 +30,9 @@ export const convertStreamingMessageChunkEvent = async (
     });
     const mapperAction = mapper();
     const activity = await mapperAction(event);
-    logConvertStreamingMessageChunkEvent(event);
+    LoggerUtils.logConvertStreamingMessageChunkEvent(event);
     return activity;
   } catch (error) {
-    logIngressStreamingChunkFailed(event, getState, error.message ?? '');
+    LoggerUtils.logIngressStreamingChunkFailed(event, getState, error.message ?? '');
   }
 };

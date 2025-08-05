@@ -1,13 +1,12 @@
 import { ACSAdapterState, StateKey } from './models/ACSAdapterState';
 import { AdapterCreator, AdapterEnhancer, ReadyState } from './types/AdapterTypes';
-import { ILogger, LogLevel, Logger } from './log/Logger';
+import { ILogger, Logger } from './log/Logger';
 import { SDKInit } from './sdk/SDKInit';
 import { ACSDirectLineActivity } from './models/ACSDirectLineActivity';
 import { AdapterOptions } from './types/AdapterTypes';
 import { ChatClient } from '@azure/communication-chat';
 import EventManager from './utils/EventManager';
 import { IFileManager } from './types/FileManagerTypes';
-import { LogEvent } from './types/LogTypes';
 import { authConfig } from './sdk/Auth';
 import { compose } from 'redux';
 import createEgressEnhancer from './egress';
@@ -15,6 +14,8 @@ import createIngressEnhancer from './ingress';
 import ConnectivityManager from './utils/ConnectivityManager';
 import { ErrorEventSubscriber, IErrorEventSubscriber } from './event/ErrorEventNotifier';
 import { MessagePollingHandle } from './types/MessagePollingTypes';
+import { LoggerUtils } from './utils/LoggerUtils';
+import { LogEvent } from './types';
 
 export default function createACSStoreEnhancer(
   token: string,
@@ -78,10 +79,7 @@ export default function createACSStoreEnhancer(
           }
           adapter.setReadyState(ReadyState.OPEN);
 
-          Logger.logEvent(LogLevel.INFO, {
-            Event: LogEvent.ACS_SDK_RECONNECT,
-            Description: `ACS Adapter: Reconnect to network.`
-          });
+          LoggerUtils.logSimpleInfoEvent(LogEvent.ACS_SDK_RECONNECT, `ACS Adapter: Reconnect to network.`);
         });
         eventManager.addEventListener('offline', () => {
           adapter.setReadyState(ReadyState.CONNECTING);

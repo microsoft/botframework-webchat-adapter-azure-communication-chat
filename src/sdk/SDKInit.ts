@@ -4,7 +4,8 @@ import { authConfig } from './Auth';
 import { config } from './Config';
 import { ErrorEventSubscriber } from '../event/ErrorEventNotifier';
 import { AdapterErrorEventType } from '../types/ErrorEventTypes';
-import { logSDKJoinThreadError, logSDKStartInit, logSDKStartInitError } from '../utils/LoggerUtils';
+import { LoggerUtils } from '../utils/LoggerUtils';
+import { LogEvent } from '../types/LogTypes';
 
 export const SDKInit = async (
   token: string,
@@ -20,7 +21,7 @@ export const SDKInit = async (
   };
   try {
     if (!token) {
-      logSDKStartInitError(threadId, id, `ACS Adapter: ACS Adapter start init error. Token is null.`);
+      LoggerUtils.logSDKStartInitError(threadId, id, `ACS Adapter: ACS Adapter start init error. Token is null.`);
       ErrorEventSubscriber.notifyErrorEvent({
         ErrorType: AdapterErrorEventType.ADAPTER_INIT_TOKEN_MISSING_ERROR,
         Timestamp: new Date().toISOString(),
@@ -31,7 +32,7 @@ export const SDKInit = async (
       });
     }
     if (!threadId) {
-      logSDKStartInitError(threadId, id, `ACS Adapter: ACS Adapter start init error. ThreadId is null.`);
+      LoggerUtils.logSDKStartInitError(threadId, id, `ACS Adapter: ACS Adapter start init error. ThreadId is null.`);
       ErrorEventSubscriber.notifyErrorEvent({
         ErrorType: AdapterErrorEventType.ADAPTER_INIT_THREAD_ID_MISSING_ERROR,
         Timestamp: new Date().toISOString(),
@@ -47,7 +48,7 @@ export const SDKInit = async (
 
     config.displayName = displayName ?? '';
 
-    logSDKStartInit(threadId, id);
+    LoggerUtils.logSDKStartInit(threadId, id);
 
     const userAccessTokenCredentialNew = new AzureCommunicationTokenCredential(token);
 
@@ -56,14 +57,14 @@ export const SDKInit = async (
     SDK.chatThreadClient = SDK.chatClient.getChatThreadClient(threadId);
 
     if (!SDK.chatThreadClient) {
-      logSDKJoinThreadError();
+      LoggerUtils.logSimpleErrorEvent(LogEvent.ACS_SDK_JOINTHREAD_ERROR, `ACS Adapter: failed to join the thread.`);
     }
 
     await SDK.chatClient.startRealtimeNotifications();
 
     return SDK;
   } catch (exception) {
-    logSDKStartInitError(threadId, id, `ACS Adapter: ACS Adapter start init error.`, exception);
+    LoggerUtils.logSDKStartInitError(threadId, id, `ACS Adapter: ACS Adapter start init error.`, exception);
     ErrorEventSubscriber.notifyErrorEvent({
       ErrorType: AdapterErrorEventType.ADAPTER_INIT_EXCEPTION,
       ErrorMessage: exception.message,
