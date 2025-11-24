@@ -35,13 +35,13 @@ variables:
 
 resources:
   repositories:
-    - repository: 1ESPipelineTemplates
+    - repository: ic3Pipelines
       type: git
-      name: 1ESPipelineTemplates/1ESPipelineTemplates
-      ref: refs/tags/release
+      name: ES/internal_build_ic3pt
+      ref: refs/heads/master
 
 extends:
-  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  template: v1/IC3.Official.PipelineTemplate.yml@ic3Pipelines
   parameters:
     serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
     featureFlags:
