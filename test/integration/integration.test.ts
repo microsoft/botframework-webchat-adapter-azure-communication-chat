@@ -1,5 +1,7 @@
 import { Builder, By, until, WebElementCondition, ThenableWebDriver, Browser } from 'selenium-webdriver';
-import Chrome from 'selenium-webdriver/chrome'
+import Chrome from 'selenium-webdriver/chrome';
+import ChromeDriver from 'chromedriver';
+import { log, error } from "console";
 
 const ELEMENT_WAITING_TIME = 30 * 1000;
 const TEST_WAITING_TIME = 60 * 1000;
@@ -10,6 +12,8 @@ const testIf = (condition: boolean, ...args: Parameters<typeof test>): void =>
   condition ? test(...args) : test.skip(...args);
 
 function getWebDriverBuilder(): Builder {
+  log('ChromeDriver Path: ' + ChromeDriver.path);
+
   return new Builder()
     .forBrowser(Browser.CHROME)
     .setChromeOptions(
