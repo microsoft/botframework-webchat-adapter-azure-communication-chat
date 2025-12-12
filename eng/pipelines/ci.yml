@@ -99,6 +99,11 @@ extends:
                   command: 'custom'
                   customCommand: 'run test:unit'
               - task: Npm@1
+                displayName: "Install ChromeDriver"
+                inputs:
+                  command: "custom"
+                  customCommand: "run install:chromedriver"
+              - task: Npm@1
                 enabled: true
                 displayName: 'Run jest integration tests'
                 env:
