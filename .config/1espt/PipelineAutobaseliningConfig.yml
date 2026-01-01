@@ -14,6 +14,8 @@ pipelines:
           lastModifiedDate: 2025-07-14
         accessibilityinsights:
           lastModifiedDate: 2025-07-14
+        bandit:
+          lastModifiedDate: 2026-01-01
       binary:
         credscan:
           lastModifiedDate: 2025-07-14
@@ -21,3 +23,4 @@ pipelines:
           lastModifiedDate: 2025-07-14
         spotbugs:
           lastModifiedDate: 2025-07-14
+    usedNonDefaultBranch: true
