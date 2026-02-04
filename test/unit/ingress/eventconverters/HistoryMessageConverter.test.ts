@@ -180,6 +180,7 @@ describe('HistoryMessageConverter', () => {
       expect(result).toBe(true);
       expect(processParticipants).toHaveBeenCalledWith(
         mockParticipantAddedMessage.content?.participants,
+        mockParticipantAddedMessage.createdOn,
         Constants.PARTICIPANT_JOINED,
         getState,
         next
@@ -199,6 +200,7 @@ describe('HistoryMessageConverter', () => {
       expect(result).toBe(true);
       expect(processParticipants).toHaveBeenCalledWith(
         mockParticipantRemovedMessage.content?.participants,
+        mockParticipantRemovedMessage.createdOn,
         Constants.PARTICIPANT_LEFT,
         getState,
         next

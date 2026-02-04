@@ -1,6 +1,6 @@
 {
   "name": "@microsoft/botframework-webchat-adapter-azure-communication-chat",
-  "version": "0.0.1-beta.5",
+  "version": "0.0.1-beta.6",
   "description": "An adapter for connecting WebChat with Azure Communication Services",
   "main": "dist/chat-adapter",
   "module": "dist-esm/index",

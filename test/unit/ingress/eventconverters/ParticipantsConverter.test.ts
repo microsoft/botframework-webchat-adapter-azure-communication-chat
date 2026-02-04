@@ -73,7 +73,7 @@ describe('ParticipantsConverter', () => {
       }
     ];
 
-    await processParticipants(participants, 'mockTag', mockGetState, mockNext);
+    await processParticipants(participants, new Date(), 'mockTag', mockGetState, mockNext);
 
     expect(mockNext).toHaveBeenCalledTimes(2);
     expect(mockNext).toHaveBeenCalledWith(mockActivity);
@@ -81,7 +81,7 @@ describe('ParticipantsConverter', () => {
   });
 
   test('processParticipants should handle empty participants array', async () => {
-    await processParticipants([], 'mockTag', mockGetState, mockNext);
+    await processParticipants([], new Date(), 'mockTag', mockGetState, mockNext);
 
     expect(mockNext).not.toHaveBeenCalled();
     expect(createThreadUpdateToDirectLineActivityMapper).not.toHaveBeenCalled();
