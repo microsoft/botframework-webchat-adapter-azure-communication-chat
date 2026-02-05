@@ -208,7 +208,7 @@ extends:
                 enabled: true
                 timeoutInMinutes: 0
                 inputs:
-                  connectedservicename: ACS WebchatAdapter ESRP Release Connection
+                  connectedServiceName: 'ACS WebchatAdapter ESRP Release Connection'
                   usemanagedidentity: true
                   keyvaultname: AcsWebChatAdapterRelease
                   signcertname: AcsWCA-ReleaseCert-9b8f
