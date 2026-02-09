@@ -281,7 +281,7 @@ describe('MessageComparison participants added tests', () => {
     };
 
     const key = createParticipantMessageKeyWithMessage(message);
-    expect(key).toEqual('2022-10-10T15:55:09_initiator1_539d920e');
+    expect(key).toEqual('2022-10-10T15:55:09_initiator1_539d920e_participantAdded');
   });
 
   test('createParticipantMessageKeyWithParticipantsEvent generates correct key for ParticipantsAddedEvent', async () => {
@@ -312,7 +312,25 @@ describe('MessageComparison participants added tests', () => {
     };
 
     const key = createParticipantMessageKeyWithParticipantsEvent(event);
-    expect(key).toEqual('2022-10-10T15:55:09_initiator2_539d920e');
+    expect(key).toEqual('2022-10-10T15:55:09_initiator2_539d920e_participantAdded');
+  });
+
+  test('createParticipantMessageKeyWithMessage should throw error when type is missing', () => {
+    const message = {
+      id: '123',
+      type: undefined,
+      sequenceId: '1',
+      version: '1',
+      content: {
+        initiator: { communicationUserId: 'initiator1', kind: 'communicationUser' },
+        participants: testParticipants
+      },
+      createdOn
+    } as unknown as ChatMessage;
+
+    expect(() => {
+      createParticipantMessageKeyWithMessage(message);
+    }).toThrow('Message does not contain type information');
   });
 });
 
@@ -477,7 +495,7 @@ describe('MessageComparison participants removed tests', () => {
     };
 
     const key = createParticipantMessageKeyWithMessage(message);
-    expect(key).toEqual('2022-10-10T15:55:09_initiator1_539d920e');
+    expect(key).toEqual('2022-10-10T15:55:09_initiator1_539d920e_participantRemoved');
   });
 
   test('createParticipantMessageKeyWithParticipantsEvent generates correct key', async () => {
@@ -508,6 +526,77 @@ describe('MessageComparison participants removed tests', () => {
     };
 
     const key = createParticipantMessageKeyWithParticipantsEvent(event);
-    expect(key).toEqual('2022-10-10T15:55:09_initiator2_539d920e');
+    expect(key).toEqual('2022-10-10T15:55:09_initiator2_539d920e_participantRemoved');
   });
 });
+
+describe('MessageComparison participant add/remove collision regression', () => {
+  const createdOn = new Date('2022-10-10T15:55:09Z');
+  const testParticipants: ChatParticipant[] = [
+    {
+      id: { communicationUserId: 'user1', kind: 'communicationUser' } as CommunicationUserIdentifier,
+      displayName: 'User 1',
+      shareHistoryTime: new Date('2022-10-10T15:55:09Z'),
+      metadata: {}
+    }
+  ];
+
+  test('does not throw and returns false when cache has addedParticipants but received has removedParticipants', () => {
+    const cache: Map<string, ChatEqualityFields> = new Map([
+      [
+        'collisionKey',
+        {
+          addedParticipants: testParticipants,
+          createdOn
+        }
+      ]
+    ]);
+
+    expect(() =>
+      checkDuplicateParticipantMessage(cache, 'collisionKey', { removedParticipants: testParticipants })
+    ).not.toThrow();
+
+    expect(
+      checkDuplicateParticipantMessage(cache, 'collisionKey', { removedParticipants: testParticipants })
+    ).toEqual(false);
+  });
+
+  test('does not throw and returns false when cache has removedParticipants but received has addedParticipants', () => {
+    const cache: Map<string, ChatEqualityFields> = new Map([
+      [
+        'collisionKey',
+        {
+          removedParticipants: testParticipants,
+          createdOn
+        }
+      ]
+    ]);
+
+    expect(() =>
+      checkDuplicateParticipantMessage(cache, 'collisionKey', { addedParticipants: testParticipants })
+    ).not.toThrow();
+
+    expect(
+      checkDuplicateParticipantMessage(cache, 'collisionKey', { addedParticipants: testParticipants })
+    ).toEqual(false);
+  });
+
+  test('participantAdded and participantRemoved keys differ when all other fields are identical', () => {
+    const baseMessage = {
+      id: '123',
+      sequenceId: '1',
+      version: '1',
+      content: {
+        initiator: { communicationUserId: 'initiator1', kind: 'communicationUser' },
+        participants: testParticipants
+      },
+      createdOn
+    } as any;
+
+    const addKey = createParticipantMessageKeyWithMessage({ ...baseMessage, type: 'participantAdded' });
+    const removeKey = createParticipantMessageKeyWithMessage({ ...baseMessage, type: 'participantRemoved' });
+
+    expect(addKey).not.toEqual(removeKey);
+  });
+});
+
