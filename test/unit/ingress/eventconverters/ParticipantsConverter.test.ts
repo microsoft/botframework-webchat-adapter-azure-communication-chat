@@ -51,10 +51,14 @@ describe('ParticipantsConverter', () => {
   });
 
   test('convertThreadUpdate should extract user ID and create thread update activity', async () => {
-    const result = await convertThreadUpdate(mockGetState, mockParticipant, Constants.PARTICIPANT_JOINED);
+    var timestamp = new Date();
+    const result = await convertThreadUpdate(mockGetState, mockParticipant, timestamp, Constants.PARTICIPANT_JOINED);
 
     expect(getIdFromIdentifier).toHaveBeenCalledWith({ communicationUserId: 'user1' });
-    expect(createThreadUpdateToDirectLineActivityMapper).toHaveBeenCalledWith({ getState: mockGetState });
+    expect(createThreadUpdateToDirectLineActivityMapper).toHaveBeenCalledWith({ 
+      getState: mockGetState,
+      timestamp: timestamp
+    });
     expect(mockMapperFunction).toHaveBeenCalledWith({
       displayName: 'Mock User',
       tag: Constants.PARTICIPANT_JOINED,
