@@ -51,10 +51,14 @@ describe('ParticipantsConverter', () => {
   });
 
   test('convertThreadUpdate should extract user ID and create thread update activity', async () => {
-    const result = await convertThreadUpdate(mockGetState, mockParticipant, Constants.PARTICIPANT_JOINED);
+    var timestamp = new Date();
+    const result = await convertThreadUpdate(mockGetState, mockParticipant, timestamp, Constants.PARTICIPANT_JOINED);
 
     expect(getIdFromIdentifier).toHaveBeenCalledWith({ communicationUserId: 'user1' });
-    expect(createThreadUpdateToDirectLineActivityMapper).toHaveBeenCalledWith({ getState: mockGetState });
+    expect(createThreadUpdateToDirectLineActivityMapper).toHaveBeenCalledWith({ 
+      getState: mockGetState,
+      timestamp: timestamp
+    });
     expect(mockMapperFunction).toHaveBeenCalledWith({
       displayName: 'Mock User',
       tag: Constants.PARTICIPANT_JOINED,
@@ -73,7 +77,7 @@ describe('ParticipantsConverter', () => {
       }
     ];
 
-    await processParticipants(participants, 'mockTag', mockGetState, mockNext);
+    await processParticipants(participants, new Date(), 'mockTag', mockGetState, mockNext);
 
     expect(mockNext).toHaveBeenCalledTimes(2);
     expect(mockNext).toHaveBeenCalledWith(mockActivity);
@@ -81,7 +85,7 @@ describe('ParticipantsConverter', () => {
   });
 
   test('processParticipants should handle empty participants array', async () => {
-    await processParticipants([], 'mockTag', mockGetState, mockNext);
+    await processParticipants([], new Date(), 'mockTag', mockGetState, mockNext);
 
     expect(mockNext).not.toHaveBeenCalled();
     expect(createThreadUpdateToDirectLineActivityMapper).not.toHaveBeenCalled();

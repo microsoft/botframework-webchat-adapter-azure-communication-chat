@@ -37,13 +37,13 @@ export const processHistoryMessage = async (
       }
       case 'participantAdded': {
         if (message.content.participants) {
-          processParticipants(message.content.participants, Constants.PARTICIPANT_JOINED, getState, next);
+          processParticipants(message.content.participants, message.createdOn,Constants.PARTICIPANT_JOINED, getState, next);
         }
         break;
       }
       case 'participantRemoved': {
         if (message.content.participants) {
-          processParticipants(message.content.participants, Constants.PARTICIPANT_LEFT, getState, next);
+          processParticipants(message.content.participants, message.createdOn, Constants.PARTICIPANT_LEFT, getState, next);
         }
         break;
       }
@@ -67,14 +67,14 @@ export const convertAndProcessHistoryMessageByType = async (
     }
     case 'participantAdded': {
       for (const participant of message.content.participants) {
-        const activity = await convertThreadUpdate(getState, participant, Constants.PARTICIPANT_JOINED);
+        const activity = await convertThreadUpdate(getState, participant, message.createdOn, Constants.PARTICIPANT_JOINED);
         updateHistoryActivityFromFieldIfActivityValid(activity, message, getState, next, logDescription);
       }
       break;
     }
     case 'participantRemoved': {
       for (const participant of message.content.participants) {
-        const activity = await convertThreadUpdate(getState, participant, Constants.PARTICIPANT_LEFT);
+        const activity = await convertThreadUpdate(getState, participant, message.createdOn, Constants.PARTICIPANT_LEFT);
         updateHistoryActivityFromFieldIfActivityValid(activity, message, getState, next, logDescription);
       }
       break;

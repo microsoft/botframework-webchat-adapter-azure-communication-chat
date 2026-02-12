@@ -1,4 +1,9 @@
 # Release History
+## 0.0.1-beta.6
+
+### Added
+
+- Use actual `addedOn`, `removedOn`, `createdOn` timestamps for add/remove participant events
 
 ## 0.0.1-beta.5
 
