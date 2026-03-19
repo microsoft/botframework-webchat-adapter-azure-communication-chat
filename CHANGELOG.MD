@@ -1,5 +1,5 @@
 # Release History
-## 0.0.1-beta.6 (unreleased)
+## 0.0.1-beta.6
 
 ### Added
 - Add message type to the generated participant message key to prevent collisions when initiator, timestamp, and participants are identical.
