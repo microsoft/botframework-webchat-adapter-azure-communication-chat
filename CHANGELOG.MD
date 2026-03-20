@@ -4,6 +4,7 @@
 ### Added
 
 - Use actual `addedOn`, `removedOn`, `createdOn` timestamps for add/remove participant events
+- Add message type to the generated participant message key to prevent collisions when initiator, timestamp, and participants are identical.
 
 ## 0.0.1-beta.5
 
