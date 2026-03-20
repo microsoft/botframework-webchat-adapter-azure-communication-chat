@@ -551,6 +551,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       LoggerUtils.logProcessCachedParticipantsAddedEvent(pendingMessageEvent);
                       processParticipants(
                         pendingMessageEvent.participantsAdded,
+                        pendingMessageEvent.addedOn,
                         Constants.PARTICIPANT_JOINED,
                         getState,
                         next
@@ -559,6 +560,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                       LoggerUtils.logProcessCachedParticipantsRemovedEvent(pendingMessageEvent);
                       processParticipants(
                         pendingMessageEvent.participantsRemoved,
+                        pendingMessageEvent.removedOn,
                         Constants.PARTICIPANT_LEFT,
                         getState,
                         next
@@ -715,7 +717,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     LoggerUtils.logParticipantAddedEventAlreadyProcessed(getState, event);
                     return;
                   }
-                  processParticipants(event.participantsAdded, Constants.PARTICIPANT_JOINED, getState, next);
+                  processParticipants(event.participantsAdded, event.addedOn, Constants.PARTICIPANT_JOINED, getState, next);
                 }
               };
 
@@ -734,7 +736,7 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     return;
                   }
 
-                  processParticipants(event.participantsRemoved, Constants.PARTICIPANT_LEFT, getState, next);
+                  processParticipants(event.participantsRemoved, event.removedOn, Constants.PARTICIPANT_LEFT, getState, next);
                 }
               };
 
