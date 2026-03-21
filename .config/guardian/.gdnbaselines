@@ -21,6 +21,7 @@
       "tool": "binskim",
       "ruleId": "BA2001",
       "createdDate": "2026-03-20 20:39:00Z",
+      "expirationDate": "2026-09-16 20:39:00Z",
       "justification": "Third-party pre-compiled binary from esbuild npm package (v0.14.54). Cannot be rebuilt by this project. ASLR base address is a build-time property of the upstream esbuild project."
     }
   }
