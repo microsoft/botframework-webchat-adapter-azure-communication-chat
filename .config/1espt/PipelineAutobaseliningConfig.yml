@@ -23,4 +23,6 @@ pipelines:
           lastModifiedDate: 2025-07-14
         spotbugs:
           lastModifiedDate: 2025-07-14
+        roslyn:
+          lastModifiedDate: 2026-03-21
     usedNonDefaultBranch: true

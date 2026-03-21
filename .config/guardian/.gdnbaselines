@@ -1,0 +1,31 @@
+{
+  "properties": {
+    "helpUri": "https://eng.ms/docs/microsoft-security/security/azure-security/cloudai-security-fundamentals-engineering/security-integration/guardian-wiki/microsoft-guardian/general/baselines"
+  },
+  "version": "1.0.0",
+  "baselines": {
+    "default": {
+      "name": "default",
+      "createdDate": "2026-03-21 01:00:36Z",
+      "lastUpdatedDate": "2026-03-21 01:00:36Z"
+    }
+  },
+  "results": {
+    "0c1ff630b247b06c0f461026df16acbd0740a743f36269f4d6884f3134b3a021": {
+      "signature": "0c1ff630b247b06c0f461026df16acbd0740a743f36269f4d6884f3134b3a021",
+      "alternativeSignatures": [
+        "87b68763908d09c4f54e2e8c259b6e9da9337acafdc8395420942ce0e7acebfc"
+      ],
+      "target": "node_modules/esbuild-windows-64/esbuild.exe",
+      "uriBaseId": "file:///C:/_work/1/s/",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2001",
+      "createdDate": "2026-03-21 01:00:36Z",
+      "expirationDate": "2026-09-07 01:10:02Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-03-21 01:10:02Z"
+    }
+  }
+}
