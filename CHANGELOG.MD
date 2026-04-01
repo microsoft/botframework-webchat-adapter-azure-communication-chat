@@ -1,4 +1,10 @@
 # Release History
+## 0.0.1-beta.7
+
+### Fixed
+
+- Fix issue with some dependency package.
+
 ## 0.0.1-beta.6
 
 ### Added
