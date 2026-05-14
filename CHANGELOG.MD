@@ -1,4 +1,10 @@
 # Release History
+## 0.0.1-beta.8
+
+### Fixed
+
+- Restore fast-poll cadence at session start. The 1-second initial polling loop in `pollForMessages` stopped engaging when the package was rebuilt with TypeScript 5.x, due to a change in how async arrow functions with default parameters are emitted. Effective polling cadence at session start collapsed from ~1s to ~16s. Defaulting `iteration` inside the function body keeps TypeScript on the simpler emit pattern and restores the documented "1s polling for the first 45 seconds, then regular cadence" behavior.
+
 ## 0.0.1-beta.7
 
 ### Fixed

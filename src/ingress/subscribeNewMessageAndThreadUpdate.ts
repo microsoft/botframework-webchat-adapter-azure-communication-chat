@@ -316,8 +316,16 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                 chatThreadClient: ChatThreadClient,
                 startTime?: Date,
                 lastMessageReceived?: string,
-                iteration = 0
+                iteration?: number
               ): Promise<void> => {
+                // Avoid an inline default parameter (`iteration = 0`) here: TypeScript 5.x
+                // emits async arrow functions with default params using a `(...args_1)` rest
+                // wrapper around an inner generator. In that emit, the `iteration` value
+                // captured by the closures below does not propagate as expected, so the
+                // fast-poll branch (`iteration <= initialPollingOptimizationCount`) never
+                // engages and polling collapses to the 15s watchdog interval. Defaulting
+                // inside the body keeps the emitted shape compatible with older TS targets.
+                const i = iteration ?? 0;
                 const pageSize = adapterOptions && adapterOptions.serverPageSizeLimit;
                 let pollingException: any;
 
@@ -423,13 +431,13 @@ export default function createSubscribeNewMessageAndThreadUpdateEnhancer(): Adap
                     }
                     pollingCallbackId = window.setTimeout(
                       async () => {
-                        if (iteration <= initialPollingOptimizationCount) {
+                        if (i <= initialPollingOptimizationCount) {
                           previousPollingCallTimerFinished = true;
                         }
 
-                        await pollForMessages(delaytm, chatThreadClient, startTime, lastMessageReceived, iteration + 1);
+                        await pollForMessages(delaytm, chatThreadClient, startTime, lastMessageReceived, i + 1);
                       },
-                      iteration <= initialPollingOptimizationCount ? 1000 : delaytm
+                      i <= initialPollingOptimizationCount ? 1000 : delaytm
                     );
 
                     LoggerUtils.logPollingCallbackCreated(getState, pollingCallbackId);
