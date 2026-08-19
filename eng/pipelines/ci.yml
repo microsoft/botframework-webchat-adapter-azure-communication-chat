@@ -44,6 +44,8 @@ extends:
   template: v1/IC3.Official.PipelineTemplate.yml@ic3Pipelines
   parameters:
     serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
+    settings:
+      networkIsolationPolicy: CFSClean,CFSClean2,CFSClean3,GitHub
     featureFlags:
       enableSRMonitoring: true
     # sdl:
@@ -69,10 +71,19 @@ extends:
                 displayName: 'Install Node LTS'
                 inputs:
                   versionSpec: '22.x'
+
+              # Injects the CFS feed credential into the committed /.npmrc.
+              # Must precede every npm restore below.
+              - task: NpmAuthenticate@0
+                displayName: 'Authenticate to CFS feed'
+                inputs:
+                  workingFile: $(Build.SourcesDirectory)/.npmrc
+
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
                   command: "install"
+                  workingDir: '$(Build.SourcesDirectory)'
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
@@ -98,6 +109,9 @@ extends:
                 inputs:
                   command: 'custom'
                   customCommand: 'run test:unit'
+              # Postinstall fetches the driver binary from googlechromelabs.github.io /
+              # storage.googleapis.com. Not a registry call, so CFS cannot route it and
+              # CFSClean will block it. Use $(ChromeWebDriver) from the image, or a mirror.
               - task: Npm@1
                 displayName: "Install ChromeDriver"
                 inputs:
@@ -142,6 +156,13 @@ extends:
                 inputs:
                   versionSpec: '22.x'
 
+              # Injects the CFS feed credential into the committed /.npmrc.
+              # Must precede the `npm ci` and `npm pack` steps below.
+              - task: NpmAuthenticate@0
+                displayName: 'Authenticate to CFS feed'
+                inputs:
+                  workingFile: $(Build.SourcesDirectory)/.npmrc
+
               - task: PowerShell@2
                 displayName: Set alpha release tag and push to GitHub
                 condition: eq(variables.releaseType, 'dev') # Only on alpha-tagged releases
@@ -167,6 +188,7 @@ extends:
                 displayName: "Install Dependencies"
                 inputs:
                   command: "ci"
+                  workingDir: '$(Build.SourcesDirectory)'
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
