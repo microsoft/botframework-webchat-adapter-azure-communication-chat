@@ -125,8 +125,8 @@ extends:
                   command: 'custom'
                   customCommand: 'run test:unit'
               # Postinstall fetches the driver binary from googlechromelabs.github.io /
-              # storage.googleapis.com. Not a registry call, so CFS cannot route it and
-              # CFSClean will block it. Use $(ChromeWebDriver) from the image, or a mirror.
+              # storage.googleapis.com. This is not a blocker for CFSClean.
+              # Follow up. Use $(ChromeWebDriver) from the image, or a mirror.
               - task: Npm@1
                 displayName: "Install ChromeDriver"
                 inputs:
