@@ -73,11 +73,6 @@ extends:
           - job: buildJob
             displayName: CI Build and Test
             steps:
-              - task: Npm@1
-                displayName: 'Set postinstall scripts to true'
-                inputs:
-                  command: 'custom'
-                  customCommand: 'config set ignore-scripts false'
               - task: NodeTool@0
                 displayName: 'Install Node LTS'
                 inputs:
@@ -158,11 +153,6 @@ extends:
                   git:
                     persistCredentials: true
               steps:
-                - task: Npm@1
-                  displayName: 'Set postinstall scripts to true'
-                  inputs:
-                    command: 'custom'
-                    customCommand: 'config set ignore-scripts false'
                 - task: NodeTool@0
                   displayName: 'Install Node LTS'
                   inputs:
