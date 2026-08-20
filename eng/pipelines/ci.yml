@@ -55,8 +55,17 @@ extends:
   template: v1/IC3.Official.PipelineTemplate.yml@ic3Pipelines
   parameters:
     serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
+    # Network Isolation (SFI-ES4.2.4). WARNING: this list replaces, it does not add --
+    # any policy 1ES auto-applied from observed behaviour stops applying, so reconcile
+    # against the 1ES portal before editing.
+    #   Permissive  - base policy; without it even skype.visualstudio.com is blocked,
+    #                 and NpmAuthenticate fails with "Unable to retrieve packaging
+    #                 service URLs". Every 1ES pipeline pairs a base policy with CFSClean.
+    #   CFSClean/2/3 - package restore against the CFS feed (pkgs.dev.azure.com).
+    #   GitHub       - release stage pushes version tags to github.com.
+    # Docs: https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-build/cloudbuild/security/1espt-network-isolation
     settings:
-      networkIsolationPolicy: CFSClean,CFSClean2,CFSClean3,GitHub
+      networkIsolationPolicy: Permissive,CFSClean,CFSClean2,CFSClean3,GitHub
     featureFlags:
       enableSRMonitoring: true
     # sdl:
