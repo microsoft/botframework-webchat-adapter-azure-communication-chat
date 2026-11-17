@@ -29,6 +29,17 @@ parameters:
     - 'next'          # Beta release
     #- 'latest'        # Stable, disabled for now; not released as stable
 
+  # Disabled: the 'ACS WebchatAdapter ESRP Release Connection' service connection no
+  # longer exists in skype/SCC (last successful run 2026-05-23; deleted since). ADO
+  # resolves service connections at compile time, so a runtime `condition` is not
+  # enough -- the stage must be excluded during template expansion or the whole
+  # pipeline fails validation before any stage runs.
+  # Flip back to true once the connection is recreated and authorized for pipeline 30207.
+  - name: enableEsrpRelease
+    displayName: Enable ESRP release stage
+    type: boolean
+    default: false
+
 variables:
   - name: releaseType
     value: ${{ iif (eq(variables['Build.CronSchedule.DisplayName'], 'Nightly Alpha Release Build'), 'dev', parameters.npmReleaseType) }}
@@ -44,6 +55,17 @@ extends:
   template: v1/IC3.Official.PipelineTemplate.yml@ic3Pipelines
   parameters:
     serviceTreeId: e38fcba7-191b-47ad-bb71-aeff7c983e3f
+    # Network Isolation (SFI-ES4.2.4). WARNING: this list replaces, it does not add --
+    # any policy 1ES auto-applied from observed behaviour stops applying, so reconcile
+    # against the 1ES portal before editing.
+    #   Permissive  - base policy; without it even skype.visualstudio.com is blocked,
+    #                 and NpmAuthenticate fails with "Unable to retrieve packaging
+    #                 service URLs". Every 1ES pipeline pairs a base policy with CFSClean.
+    #   CFSClean/2/3 - package restore against the CFS feed (pkgs.dev.azure.com).
+    #   GitHub       - release stage pushes version tags to github.com.
+    # Docs: https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-build/cloudbuild/security/1espt-network-isolation
+    settings:
+      networkIsolationPolicy: Permissive,CFSClean,CFSClean2,CFSClean3,GitHub
     featureFlags:
       enableSRMonitoring: true
     # sdl:
@@ -60,19 +82,23 @@ extends:
           - job: buildJob
             displayName: CI Build and Test
             steps:
-              - task: Npm@1
-                displayName: 'Set postinstall scripts to true'
-                inputs:
-                  command: 'custom'
-                  customCommand: 'config set ignore-scripts false'
               - task: NodeTool@0
                 displayName: 'Install Node LTS'
                 inputs:
                   versionSpec: '22.x'
+
+              # Injects the CFS feed credential into the committed /.npmrc.
+              # Must precede every npm restore below.
+              - task: NpmAuthenticate@0
+                displayName: 'Authenticate to CFS feed'
+                inputs:
+                  workingFile: $(Build.SourcesDirectory)/.npmrc
+
               - task: Npm@1
                 displayName: "Install Dependencies"
                 inputs:
                   command: "install"
+                  workingDir: '$(Build.SourcesDirectory)'
               - task: Npm@1
                 displayName: "Build App"
                 inputs:
@@ -98,6 +124,9 @@ extends:
                 inputs:
                   command: 'custom'
                   customCommand: 'run test:unit'
+              # Postinstall fetches the driver binary from googlechromelabs.github.io /
+              # storage.googleapis.com. This is not a blocker for CFSClean.
+              # Follow up. Use $(ChromeWebDriver) from the image, or a mirror.
               - task: Npm@1
                 displayName: "Install ChromeDriver"
                 inputs:
@@ -117,114 +146,118 @@ extends:
                 inputs:
                     BuildDropPath: $(System.DefaultWorkingDirectory)
 
-      - stage: releaseStage
-        dependsOn: buildStage
-        condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest') )
-        displayName: Release
-        jobs:
-          - job: releaseBuild
-            displayName: Build For Release
-            templateContext:
-              outputs:
-              - output: pipelineArtifact
-                path: $(System.DefaultWorkingDirectory)/
-              sdl:
-                git:
-                  persistCredentials: true
-            steps:
-              - task: Npm@1
-                displayName: 'Set postinstall scripts to true'
-                inputs:
-                  command: 'custom'
-                  customCommand: 'config set ignore-scripts false'
-              - task: NodeTool@0
-                displayName: 'Install Node LTS'
-                inputs:
-                  versionSpec: '22.x'
+      - ${{ if eq(parameters.enableEsrpRelease, true) }}:
+        - stage: releaseStage
+          dependsOn: buildStage
+          condition: and(succeeded(), in(variables.releaseType, 'dev', 'next', 'latest') )
+          displayName: Release
+          jobs:
+            - job: releaseBuild
+              displayName: Build For Release
+              templateContext:
+                outputs:
+                - output: pipelineArtifact
+                  path: $(System.DefaultWorkingDirectory)/
+                sdl:
+                  git:
+                    persistCredentials: true
+              steps:
+                - task: NodeTool@0
+                  displayName: 'Install Node LTS'
+                  inputs:
+                    versionSpec: '22.x'
 
-              - task: PowerShell@2
-                displayName: Set alpha release tag and push to GitHub
-                condition: eq(variables.releaseType, 'dev') # Only on alpha-tagged releases
-                continueOnError: true
-                inputs:
-                  targetType: 'inline'
-                  script: |
-                    $DATE_STAMP=$(Get-Date -format yyyyMMdd)
-                    $VersionString=$(npm version prerelease --git-tag-version false --preid alpha-$DATE_STAMP)
-                    git tag $VersionString
-                    git push origin tag $VersionString
-              - task: PowerShell@2
-                displayName: Tag non-alpha builds
-                condition: ne(variables.releaseType, 'dev') # Not alpha tagged
-                continueOnError: true
-                inputs:
-                  targetType: 'inline'
-                  script: |
-                    $VersionString=$((Get-Content -Raw -Path .\package.json | ConvertFrom-Json).version)
-                    git tag $VersionString
-                    git push origin tag $VersionString
-              - task: Npm@1
-                displayName: "Install Dependencies"
-                inputs:
-                  command: "ci"
-              - task: Npm@1
-                displayName: "Build App"
-                inputs:
-                  command: "custom"
-                  customCommand: "run build"
-              - task: Npm@1
-                displayName: "Build App (ESM)"
-                inputs:
-                  command: "custom"
-                  customCommand: "run build:es5"
-              - task: Npm@1
-                displayName: "Package for NPM"
-                inputs:
-                  command: "custom"
-                  customCommand: "run build:package"
-              - task: ManifestGeneratorTask@0
-                displayName: 'Generation Task'
-                inputs:
-                    BuildDropPath: $(System.DefaultWorkingDirectory)
+                # Injects the CFS feed credential into the committed /.npmrc.
+                # Must precede the `npm ci` and `npm pack` steps below.
+                - task: NpmAuthenticate@0
+                  displayName: 'Authenticate to CFS feed'
+                  inputs:
+                    workingFile: $(Build.SourcesDirectory)/.npmrc
 
-          - job: Release
-            displayName: Publish to NPM (ESRP)
-            dependsOn: releaseBuild
-            # Run if for a beta release, or for alpha if there are changes - the cron schedule looks after the change checking
-            condition: and(succeeded(), or(in(variables.releaseType, 'next', 'latest'), eq(variables.releaseType, 'dev')) )
-            templateContext:
-              sdl:
-                codeSignValidation:
-                  skipScanningJsInReleaseJob: true
-              type: releaseJob
-              isProduction: true
-              inputs:
-                - input: pipelineArtifact
-                  artifactName: drop
-                  targetPath: $(System.DefaultWorkingDirectory)/drop
-            steps:
-              - task: EsrpRelease@9
-                displayName: ESRP NPM Deploy
-                enabled: true
-                timeoutInMinutes: 0
+                - task: PowerShell@2
+                  displayName: Set alpha release tag and push to GitHub
+                  condition: eq(variables.releaseType, 'dev') # Only on alpha-tagged releases
+                  continueOnError: true
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $DATE_STAMP=$(Get-Date -format yyyyMMdd)
+                      $VersionString=$(npm version prerelease --git-tag-version false --preid alpha-$DATE_STAMP)
+                      git tag $VersionString
+                      git push origin tag $VersionString
+                - task: PowerShell@2
+                  displayName: Tag non-alpha builds
+                  condition: ne(variables.releaseType, 'dev') # Not alpha tagged
+                  continueOnError: true
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $VersionString=$((Get-Content -Raw -Path .\package.json | ConvertFrom-Json).version)
+                      git tag $VersionString
+                      git push origin tag $VersionString
+                - task: Npm@1
+                  displayName: "Install Dependencies"
+                  inputs:
+                    command: "ci"
+                    workingDir: '$(Build.SourcesDirectory)'
+                - task: Npm@1
+                  displayName: "Build App"
+                  inputs:
+                    command: "custom"
+                    customCommand: "run build"
+                - task: Npm@1
+                  displayName: "Build App (ESM)"
+                  inputs:
+                    command: "custom"
+                    customCommand: "run build:es5"
+                - task: Npm@1
+                  displayName: "Package for NPM"
+                  inputs:
+                    command: "custom"
+                    customCommand: "run build:package"
+                - task: ManifestGeneratorTask@0
+                  displayName: 'Generation Task'
+                  inputs:
+                      BuildDropPath: $(System.DefaultWorkingDirectory)
+
+            - job: Release
+              displayName: Publish to NPM (ESRP)
+              dependsOn: releaseBuild
+              # Run if for a beta release, or for alpha if there are changes - the cron schedule looks after the change checking
+              condition: and(succeeded(), or(in(variables.releaseType, 'next', 'latest'), eq(variables.releaseType, 'dev')) )
+              templateContext:
+                sdl:
+                  codeSignValidation:
+                    skipScanningJsInReleaseJob: true
+                type: releaseJob
+                isProduction: true
                 inputs:
-                  connectedServiceName: 'ACS WebchatAdapter ESRP Release Connection'
-                  usemanagedidentity: true
-                  keyvaultname: AcsWebChatAdapterRelease
-                  signcertname: AcsWCA-ReleaseCert-9b8f
-                  clientid: 9ed91db5-8ad8-419b-9b8f-00b5edaffd07
-                  intent: PackageDistribution
-                  contenttype: npm
-                  contentsource: Folder
-                  folderlocation: $(System.DefaultWorkingDirectory)/drop/package
-                  waitforreleasecompletion: true
-                  owners: wamo@microsoft.com
-                  approvers: eboltonmaggs@microsoft.com
-                  serviceendpointurl: https://api.esrp.microsoft.com
-                  mainpublisher: ESRPRELPACMAN
-                  downloadentity: DownloadCenter
-                  domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
-                  contentorigin: azeus
-                  productstate: $(releaseType)
-                  audience: Workflow.A_S_AV_PackageManager
+                  - input: pipelineArtifact
+                    artifactName: drop
+                    targetPath: $(System.DefaultWorkingDirectory)/drop
+              steps:
+                - task: EsrpRelease@9
+                  displayName: ESRP NPM Deploy
+                  enabled: true
+                  timeoutInMinutes: 0
+                  inputs:
+                    connectedServiceName: 'ACS WebchatAdapter ESRP Release Connection'
+                    usemanagedidentity: true
+                    keyvaultname: AcsWebChatAdapterRelease
+                    signcertname: AcsWCA-ReleaseCert-9b8f
+                    clientid: 9ed91db5-8ad8-419b-9b8f-00b5edaffd07
+                    intent: PackageDistribution
+                    contenttype: npm
+                    contentsource: Folder
+                    folderlocation: $(System.DefaultWorkingDirectory)/drop/package
+                    waitforreleasecompletion: true
+                    owners: wamo@microsoft.com
+                    approvers: eboltonmaggs@microsoft.com
+                    serviceendpointurl: https://api.esrp.microsoft.com
+                    mainpublisher: ESRPRELPACMAN
+                    downloadentity: DownloadCenter
+                    domaintenantid: cdc5aeea-15c5-4db6-b079-fcadd2505dc2
+                    contentorigin: azeus
+                    productstate: $(releaseType)
+                    audience: Workflow.A_S_AV_PackageManager
             
