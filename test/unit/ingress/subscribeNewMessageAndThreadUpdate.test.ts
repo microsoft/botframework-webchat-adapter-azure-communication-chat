@@ -6,10 +6,11 @@ import { ACSDirectLineActivity } from '../../../src/models/ACSDirectLineActivity
 import { MockAdapterTemplate } from '../mocks/AdapterMock';
 import { MockChatClient } from '../mocks/ChatClientMock';
 import { IMessagePollingHandle, MessagePollingHandle } from '../../../src/types/MessagePollingTypes';
+import { ConnectionStatus } from '../../../src/libs/enhancers/exportDLJSInterface';
 
 const chatClientMock = MockChatClient();
 
-const chatThreadClientMock = {
+const chatThreadClientMock: any = {
   listMessages: () => ({
     next: () => ({
       done: true
@@ -69,9 +70,34 @@ adapterTemplateMock.getState = (key: StateKey) => {
       return mockMessagePollHandler;
     }
   }
+  if (key === StateKey.WebChatStatus) {
+    return ConnectionStatus.Connected;
+  }
 };
 
 const nextAdapterCreator = (): Adapter<ACSDirectLineActivity, ACSAdapterState> => adapterTemplateMock;
+
+jest.mock('../../../src/ingress/eventconverters/HistoryMessageConverter', () => ({
+  convertAndProcessHistoryMessageByType: jest.fn()
+}));
+
+function makeAsyncIterator<T>(items: T[]) {
+  let i = 0;
+
+  const iterator = {
+    next: async () => {
+      if (i >= items.length) {
+        return { done: true, value: undefined };
+      }
+      return { done: false, value: items[i++] };
+    },
+    byPage: () => ({
+      next: async () => ({ done: true, value: undefined })
+    })
+  };
+
+  return iterator;
+}
 
 describe('subscribeNewMessageAndThreadUpdate tests', () => {
   beforeEach(() => {
@@ -161,5 +187,64 @@ describe('subscribeNewMessageAndThreadUpdate tests', () => {
     jest.spyOn(chatThreadClientMock, 'listMessages');
     adapter.setState(StateKey.ChatThreadClient, chatThreadClientMock);
     expect(chatThreadClientMock.listMessages).toHaveBeenCalled();
+  });
+
+  test('polling succeeds when add and remove participant events have the same timestamp, initiator, and participant list', async () => {
+    enableThreadMemberUpdateNotification = true;
+    setDefaultMessagePollingHandler = false;
+    mockMessagePollHandler.getIsPollingEnabled = () => true;
+    mockMessagePollHandler.stopPolling = () => true; // stop after first poll to keep test deterministic
+
+    const createdOn = new Date('2026-01-03T13:39:23Z');
+
+    // participantAdded and participantRemoved share same createdOn/initiator/participants
+    // -> in prod code they may generate the same dedupe key and previously could throw
+    const participantAdded: any = {
+      id: '1767447563855',
+      type: 'participantAdded',
+      createdOn,
+      sequenceId: '3',
+      version: '1',
+      content: {
+        initiator: { communicationUserId: 'system', kind: 'communicationUser' },
+        participants: [{ id: { communicationUserId: 'p1', kind: 'communicationUser' }, displayName: 'P1' }]
+      }
+    };
+
+    const participantRemoved: any = {
+      id: '1767447563066',
+      type: 'participantRemoved',
+      createdOn,
+      sequenceId: '2',
+      version: '1',
+      content: {
+        initiator: { communicationUserId: 'system', kind: 'communicationUser' },
+        participants: [{ id: { communicationUserId: 'p1', kind: 'communicationUser' }, displayName: 'P1' }]
+      }
+    };
+
+    // Older message that should still be processed if polling doesn't abort
+    const olderText: any = {
+      id: 'older-text',
+      type: 'text',
+      createdOn: new Date('2026-01-03T13:38:00Z'),
+      sequenceId: '1',
+      version: '1',
+      content: { message: 'bot says hi' },
+      sender: { communicationUserId: 'bot', kind: 'communicationUser' },
+      senderDisplayName: 'Bot'
+    };
+
+    // Iterator yields newest -> oldest
+    chatThreadClientMock.listMessages = jest.fn(() => makeAsyncIterator([participantAdded, participantRemoved, olderText]));
+
+    const adapter = createSubscribeNewMessageAndThreadUpdateEnhancer()(nextAdapterCreator)(next);
+    adapter.setState(StateKey.ChatThreadClient, chatThreadClientMock);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(chatThreadClientMock.listMessages).toHaveBeenCalledTimes(1);
   });
 });

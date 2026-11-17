@@ -10,12 +10,13 @@ import { LogEvent } from '../../types/LogTypes';
 
 export const processParticipants = async (
   participants: ChatParticipant[],
+  timestamp: Date,
   tag: string,
   getState: GetStateFunction<ACSAdapterState>,
   next: (activity: void | ACSDirectLineActivity) => void
 ): Promise<void> => {
   for (const participant of participants) {
-    const activity = await convertThreadUpdate(getState, participant, tag);
+    const activity = await convertThreadUpdate(getState, participant, timestamp, tag);
     next(activity);
   }
 };
@@ -23,6 +24,7 @@ export const processParticipants = async (
 export const convertThreadUpdate = async (
   getState: GetStateFunction<ACSAdapterState>,
   participant: ChatParticipant,
+  timestamp: Date,
   tag: string
 ): Promise<void | ACSDirectLineActivity> => {
   const userId = getIdFromIdentifier(participant.id);
@@ -31,7 +33,7 @@ export const convertThreadUpdate = async (
     tag,
     id: userId
   };
-  const activity = await createThreadUpdateToDirectLineActivityMapper({ getState })()(user);
+  const activity = await createThreadUpdateToDirectLineActivityMapper({ getState, timestamp })()(user);
 
   LoggerUtils.logSimpleInfoEvent(LogEvent.ACS_ADAPTER_CONVERT_THREAD_UPDATED, 'ACS Adapter: convert thread update');
 

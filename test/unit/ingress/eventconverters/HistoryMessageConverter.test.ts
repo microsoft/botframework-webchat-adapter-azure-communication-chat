@@ -180,6 +180,7 @@ describe('HistoryMessageConverter', () => {
       expect(result).toBe(true);
       expect(processParticipants).toHaveBeenCalledWith(
         mockParticipantAddedMessage.content?.participants,
+        mockParticipantAddedMessage.createdOn,
         Constants.PARTICIPANT_JOINED,
         getState,
         next
@@ -199,6 +200,7 @@ describe('HistoryMessageConverter', () => {
       expect(result).toBe(true);
       expect(processParticipants).toHaveBeenCalledWith(
         mockParticipantRemovedMessage.content?.participants,
+        mockParticipantRemovedMessage.createdOn,
         Constants.PARTICIPANT_LEFT,
         getState,
         next
@@ -249,6 +251,7 @@ describe('HistoryMessageConverter', () => {
       expect(convertThreadUpdate).toHaveBeenCalledWith(
         getState,
         mockParticipantAddedMessage.content?.participants?.[0],
+        mockParticipantAddedMessage.createdOn,
         Constants.PARTICIPANT_JOINED
       );
       expect(next).toHaveBeenCalledWith(
@@ -291,6 +294,7 @@ describe('HistoryMessageConverter', () => {
       expect(convertThreadUpdate).toHaveBeenCalledWith(
         getState,
         mockParticipantRemovedMessage.content?.participants?.[0],
+        mockParticipantRemovedMessage.createdOn,
         Constants.PARTICIPANT_LEFT
       );
       expect(next).toHaveBeenCalledWith(

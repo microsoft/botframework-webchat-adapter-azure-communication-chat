@@ -2,7 +2,8 @@ import {
   ChatMessage,
   ChatParticipant,
   ParticipantsAddedEvent,
-  ParticipantsRemovedEvent
+  ParticipantsRemovedEvent,
+  ChatMessageType
 } from '@azure/communication-chat';
 import { ChatEqualityFields } from '../types';
 import { CommunicationUserIdentifier } from '@azure/communication-common';
@@ -69,7 +70,7 @@ const hasSameParticipants = (
   existingParticipants: ChatParticipant[]
 ): boolean => {
   // If lengths differ, they can't be the same set
-  if (receivedParticipants.length !== existingParticipants.length) {
+  if (!existingParticipants || existingParticipants?.length !== receivedParticipants.length) {
     return false;
   }
 
@@ -119,6 +120,9 @@ const areDatesEqualIgnoringMilliseconds = (time1?: Date, time2?: Date): boolean 
  * @param message - The chat message containing the sender ID, timestamp, and participants.
  */
 export const createParticipantMessageKeyWithMessage = (message: ChatMessage): string => {
+  if (!message.type) {
+    throw new Error('Message does not contain type information');
+  }
   if (!message.content?.initiator) {
     throw new Error('Message does not contain initiator information');
   }
@@ -126,6 +130,7 @@ export const createParticipantMessageKeyWithMessage = (message: ChatMessage): st
     throw new Error('Message does not contain participants information');
   }
   return createParticipantMessageKey(
+    message.type,
     (message.content?.initiator as CommunicationUserIdentifier).communicationUserId,
     message.createdOn,
     message.content.participants
@@ -142,12 +147,14 @@ export const createParticipantMessageKeyWithParticipantsEvent = (
 ): string => {
   if (isParticipantsAddedEvent(event)) {
     return createParticipantMessageKey(
+      "participantAdded",
       (event.addedBy.id as CommunicationUserIdentifier).communicationUserId,
       event.addedOn,
       event.participantsAdded
     );
   } else if (isParticipantsRemovedEvent(event)) {
     return createParticipantMessageKey(
+      "participantRemoved",
       (event.removedBy.id as CommunicationUserIdentifier).communicationUserId,
       event.removedOn,
       event.participantsRemoved
@@ -173,7 +180,7 @@ const formatDateWithSecondsPrecision = (date: Date): string => {
  * @param participants - The list of participants.
  * @returns A string key composed of the timestamp, initiator ID, and sorted participant IDs.
  */
-const createParticipantMessageKey = (initiatorId: string, timestamp: Date, participants: ChatParticipant[]): string => {
+const createParticipantMessageKey = (type: ChatMessageType, initiatorId: string, timestamp: Date, participants: ChatParticipant[]): string => {
   const participantIds = participants
     .map((p) => (p.id as CommunicationUserIdentifier).communicationUserId)
     .sort()
@@ -181,7 +188,7 @@ const createParticipantMessageKey = (initiatorId: string, timestamp: Date, parti
 
   // Hash the participant IDs to decrease string length and ensure uniqueness
   const participantsHash = hashString(participantIds);
-  return `${formatDateWithSecondsPrecision(timestamp)}_${initiatorId}_${participantsHash}`;
+  return `${formatDateWithSecondsPrecision(timestamp)}_${initiatorId}_${participantsHash}_${type}`;
 };
 
 // Simple string hash function

@@ -9,9 +9,10 @@ import { Role } from '../../types/DirectLineTypes';
 import { ChannelDataTypes } from '../../types/ChannelDataTypes';
 
 export default function createThreadUpdateToDirectLineActivityMapper({
-  getState
+  getState, timestamp
 }: {
   getState: GetStateFunction<ACSAdapterState>;
+  timestamp?: Date;
 }): AsyncMapper<IUserUpdate, ACSDirectLineActivity> {
   const convertThreadUpdateToActivity = (
     member: IUserUpdate,
@@ -40,6 +41,6 @@ export default function createThreadUpdateToDirectLineActivityMapper({
   };
 
   return () => async (member: IUserUpdate) => {
-    return convertThreadUpdateToActivity(member, getState(StateKey.UserId), new Date().toISOString());
+    return convertThreadUpdateToActivity(member, getState(StateKey.UserId), timestamp?.toISOString() || new Date().toISOString());
   };
 }

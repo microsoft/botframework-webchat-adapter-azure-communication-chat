@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "suppressions": [
+    {
+      "tool": "BinSkim",
+      "ruleId": "BA2001",
+      "target": "node_modules/esbuild-windows-64/esbuild.exe",
+      "justification": "Third-party esbuild binary bundled via npm; required by build tooling and not under project control."
+    }
+  ]
+}
