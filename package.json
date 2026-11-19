@@ -85,6 +85,9 @@
     "webpack-dev-server": "^5.2.2",
     "webpack-merge": "^6.0.1"
   },
+  "overrides": {
+    "brace-expansion@^1.0.0": "1.1.21"
+  },
   "files": [
     "dist",
     "dist-esm",
