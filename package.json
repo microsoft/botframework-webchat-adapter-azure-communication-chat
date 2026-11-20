@@ -85,6 +85,13 @@
     "webpack-dev-server": "^5.2.2",
     "webpack-merge": "^6.0.1"
   },
+  "overrides": {
+    "botframework-directlinespeech-sdk": {
+      "@angular/common": "21.2.20",
+      "@angular/core": "21.2.20"
+    },
+    "brace-expansion@^1.0.0": "1.1.21"
+  },
   "files": [
     "dist",
     "dist-esm",
